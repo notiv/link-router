@@ -6,28 +6,28 @@ Build a dependency-free native macOS menu-bar browser router with a JSON config 
 
 ## Architecture Decisions
 
-- Use one Swift package with a pure `LinkRouterCore` library and a `LinkRouter` executable so logic is testable without launching apps.
+- Compile a small Foundation core and AppKit executable with Apple Clang so logic is testable without launching apps or requiring full Xcode.
 - Keep the reference config's readable `app`, `profile`, and ordered `hosts` fields.
-- Use AppKit's supported URL delivery and default-handler APIs; keep the app menu-bar-only with `LSUIElement`.
+- Use AppKit's supported URL delivery and default-handler APIs; keep the app menu-bar-only with `LSUIElement` and `NSStatusItem`.
 - Launch Chrome's resolved executable with an argument array so profile selection works without shell parsing.
-- Build a local `.app` bundle through a checked-in script because only Command Line Tools, not full Xcode, are currently selected.
+- Build a local `.app` bundle through a checked-in Makefile because the installed Swift compiler and SDK patch versions do not match, while Apple Clang is functional.
 
 ## Task List
 
 ### Phase 1: Foundation
 
-- [ ] Task 1: Scaffold the Swift package and write failing routing/config tests.
+- [ ] Task 1: Scaffold the Clang build and write failing routing/config tests.
 - [ ] Task 2: Implement validated config matching and atomic persistence.
 
 ### Checkpoint: Foundation
 
 - [ ] Focused and full tests pass.
-- [ ] Package builds without warnings.
+- [ ] Core builds without warnings.
 
 ### Phase 2: Native Shell
 
 - [ ] Task 3: Add browser launch planning and the macOS URL-handling menu-bar shell.
-- [ ] Task 4: Add Info.plist and reproducible `.app` packaging.
+- [ ] Task 4: Add Info.plist and reproducible Makefile `.app` packaging.
 
 ### Checkpoint: Native Shell
 

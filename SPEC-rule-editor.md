@@ -6,33 +6,32 @@ Provide a native window where the user can define the fallback browser and order
 
 ## Tech Stack
 
-- SwiftUI forms and lists on macOS 13+
-- Shared observable app model backed by `ConfigStore`
+- Programmatic AppKit controls on macOS 13+
+- A shared app delegate backed by `LRConfigStore`
 
 ## Commands
 
-- Build: `swift build`
-- Test: `swift test`
-- Package: `./scripts/build-app.sh`
+- Build: `make build`
+- Test: `make test`
+- Package: `make app`
 
 ## Project Structure
 
-- `Sources/LinkRouter/ConfigEditorView.swift` — fallback and ordered rule editor
-- `Sources/LinkRouter/AppModel.swift` — load, edit, validate, and save state
-- `Tests/LinkRouterCoreTests/` — validation and persistence coverage
+- `Sources/App/LRConfigWindowController.m` — fallback and ordered rule editor
+- `Sources/App/LRAppDelegate.m` — load, edit, validate, save, and route state
+- `Tests/` — validation and persistence coverage
 
 ## Code Style
 
 Use native labeled controls and explicit save state:
 
-```swift
-Picker("Browser", selection: $target.app) {
-    Text("Safari").tag(BrowserApp.safari)
-    Text("Google Chrome").tag(BrowserApp.chrome)
-}
+```objective-c
+NSPopUpButton *browserPicker = [[NSPopUpButton alloc] init];
+[browserPicker addItemsWithTitles:@[@"Safari", @"Google Chrome"]];
+[browserPicker setAccessibilityLabel:@"Browser"];
 ```
 
-The UI uses system colors, spacing, typography, and keyboard-accessible controls.
+The UI uses system colors, spacing, typography, and keyboard-accessible native controls.
 
 ## Testing Strategy
 

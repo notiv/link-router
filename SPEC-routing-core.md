@@ -2,7 +2,7 @@
 
 ## Objective
 
-Provide a small, dependency-free Swift library that turns an HTTP or HTTPS URL and a human-readable JSON config into a browser target. Rules are evaluated from top to bottom, and the first matching rule wins.
+Provide a small, dependency-free Objective-C library that turns an HTTP or HTTPS URL and a human-readable JSON config into a browser target. Rules are evaluated from top to bottom, and the first matching rule wins.
 
 The JSON format is:
 
@@ -24,33 +24,32 @@ An exact host matches only itself. A leading `*.` matches both the base domain a
 
 ## Tech Stack
 
-- Swift 6 package, compiled in Swift language mode 5 for macOS 13+
-- Foundation and Swift Testing/XCTest only; no third-party dependencies
+- Objective-C 2.0 compiled with Apple Clang for macOS 13+
+- Foundation only; no third-party dependencies
 
 ## Commands
 
-- Build: `swift build`
-- Focused tests: `swift test --filter RoutingCoreTests`
-- Full tests: `swift test`
-- Format check: `swift-format lint --recursive Sources Tests` when `swift-format` is installed
+- Build: `make build`
+- Focused and full tests: `make test`
+- App bundle: `make app`
 
 ## Project Structure
 
-- `Sources/LinkRouterCore/` — config schema, validation, persistence, and routing
-- `Tests/LinkRouterCoreTests/` — unit and temporary-filesystem tests
+- `Sources/Core/` — config schema, validation, persistence, launch plans, and routing
+- `Tests/` — standalone unit and temporary-filesystem tests
 
 ## Code Style
 
 Use explicit domain names, value types, and errors that describe a user-correctable problem:
 
-```swift
-public func target(for url: URL) throws -> BrowserTarget {
-    guard let host = url.host else { throw RoutingError.missingHost }
-    return rules.first { $0.matches(host: host) }?.target ?? defaultTarget
+```objective-c
+- (LRRouteResult *)routeForURL:(NSURL *)URL error:(NSError **)error {
+    if (![self validateWebURL:URL error:error]) { return nil; }
+    return [self firstMatchingRouteForHost:URL.host] ?: self.defaultRoute;
 }
 ```
 
-Types use `UpperCamelCase`; methods and properties use `lowerCamelCase`. Keep I/O at the boundary and matching logic pure.
+Types use an `LR` prefix and `UpperCamelCase`; methods and properties use `lowerCamelCase`. Keep I/O at the boundary and matching logic pure.
 
 ## Testing Strategy
 

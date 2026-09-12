@@ -1,16 +1,16 @@
 # LinkRouter Tasks
 
-## Task 1: Scaffold package and routing tests
+## Task 1: Scaffold build and routing tests
 
 **Acceptance criteria:**
-- [ ] Swift package exposes a core library and macOS executable.
+- [ ] Makefile exposes core test, executable, and app-bundle targets.
 - [ ] Failing tests describe config decoding, matching, validation, and persistence.
 
-**Verification:** `swift test --filter LinkRouterCoreTests`
+**Verification:** `make test` fails on the first unimplemented routing behavior.
 
 **Dependencies:** None
 
-**Files likely touched:** `Package.swift`, `Tests/LinkRouterCoreTests/*`, `.gitignore`
+**Files likely touched:** `Makefile`, `Tests/*`, `.gitignore`
 
 ## Task 2: Implement routing core
 
@@ -19,16 +19,16 @@
 - [ ] Exact, wildcard, precedence, fallback, and invalid-input cases pass.
 - [ ] Config saves atomically and reloads.
 
-**Verification:** `swift test`
+**Verification:** `make test`
 
 **Dependencies:** Task 1
 
-**Files likely touched:** `Sources/LinkRouterCore/*`
+**Files likely touched:** `Sources/Core/*`
 
 ## Checkpoint: Core
 
-- [ ] `swift test` passes.
-- [ ] `swift build` passes.
+- [ ] `make test` passes.
+- [ ] `make build` passes.
 
 ## Task 3: Implement native routing shell
 
@@ -37,11 +37,11 @@
 - [ ] Safari and Chrome profile targets use safe, explicit launch paths.
 - [ ] Menu exposes status and default-browser action.
 
-**Verification:** `swift build` and launch-plan unit tests
+**Verification:** `make test` and `make build`
 
 **Dependencies:** Task 2
 
-**Files likely touched:** `Sources/LinkRouter/*`, `Tests/LinkRouterCoreTests/LaunchPlanTests.swift`
+**Files likely touched:** `Sources/App/*`, `Sources/Core/LRLaunchPlan.*`, `Tests/*`
 
 ## Task 4: Package the app
 
@@ -49,11 +49,11 @@
 - [ ] Script creates an ad-hoc-signed `dist/LinkRouter.app`.
 - [ ] Bundle registers `http` and `https` and runs as an agent app.
 
-**Verification:** `./scripts/build-app.sh` plus `plutil` and `codesign` checks
+**Verification:** `make app` plus `plutil` and `codesign` checks
 
 **Dependencies:** Task 3
 
-**Files likely touched:** `Packaging/Info.plist`, `scripts/build-app.sh`
+**Files likely touched:** `Packaging/Info.plist`, `Makefile`
 
 ## Checkpoint: Native Shell
 
@@ -67,11 +67,11 @@
 - [ ] Validation is visible and only valid state is persisted.
 - [ ] Saved changes affect routing immediately.
 
-**Verification:** `swift test`, `swift build`, and manual editor smoke test
+**Verification:** `make test`, `make build`, and manual editor smoke test
 
 **Dependencies:** Tasks 2–4
 
-**Files likely touched:** `Sources/LinkRouter/AppModel.swift`, `Sources/LinkRouter/ConfigEditorView.swift`, `Sources/LinkRouter/LinkRouterApp.swift`
+**Files likely touched:** `Sources/App/LRAppDelegate.*`, `Sources/App/LRConfigWindowController.*`
 
 ## Task 6: Document and final-verify
 

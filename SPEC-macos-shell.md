@@ -6,36 +6,39 @@ Deliver a native, menu-bar-only macOS app named LinkRouter. macOS sends it HTTP 
 
 ## Tech Stack
 
-- SwiftUI `MenuBarExtra` and AppKit on macOS 13+
+- Objective-C 2.0 and AppKit on macOS 13+
+- `NSStatusItem` for the menu-bar interface
 - `NSApplicationDelegate.application(_:open:)` for URL delivery
 - `NSWorkspace` for app lookup, launching, and default-handler registration
-- `Process` with typed arguments for Chrome profile launches; no shell
+- `NSTask` with typed arguments for Chrome profile launches; no shell
 
 ## Commands
 
-- Build package: `swift build`
-- Test: `swift test`
-- Build app bundle: `./scripts/build-app.sh`
+- Build executable: `make build`
+- Test: `make test`
+- Build app bundle: `make app`
 - Launch packaged app: `open dist/LinkRouter.app`
 
 ## Project Structure
 
-- `Sources/LinkRouter/` — SwiftUI entry point, AppKit delegate, app state, and browser launcher
+- `Sources/App/` — AppKit entry point, delegate, app state, browser launcher, and editor
+- `Sources/Core/` — shared routing behavior
 - `Packaging/Info.plist` — app identity, URL schemes, and agent-app setting
-- `scripts/build-app.sh` — reproducible local `.app` assembly and ad-hoc signing
+- `Makefile` — reproducible build, test, `.app` assembly, and ad-hoc signing
 - `dist/` — ignored build output
 
 ## Code Style
 
 Platform side effects sit behind small protocols so core behavior remains testable:
 
-```swift
-protocol BrowserLaunching {
-    func open(_ url: URL, in target: BrowserTarget) async throws
+```objective-c
+@protocol LRBrowserLaunching <NSObject>
+- (void)openURL:(NSURL *)URL target:(LRBrowserTarget *)target;
+@end
 }
 ```
 
-All user-visible state mutations occur on the main actor.
+All user-interface mutations occur on the main thread.
 
 ## Testing Strategy
 
@@ -51,7 +54,7 @@ All user-visible state mutations occur on the main actor.
 
 ## Success Criteria
 
-- The packaged app launches as a menu-bar extra and does not appear in the Dock.
+- The packaged app launches as a status item and does not appear in the Dock.
 - Its bundle declares itself capable of handling both `http` and `https`.
 - A menu action requests LinkRouter as the default for both schemes through the supported AppKit API.
 - Incoming URLs are sent to the resolved target, including the configured Chrome profile.
