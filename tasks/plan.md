@@ -16,12 +16,12 @@ Build a dependency-free native macOS menu-bar browser router with a JSON config 
 
 ### Phase 1: Foundation
 
-- [ ] Task 1: Scaffold the Clang build and write failing routing/config tests.
-- [ ] Task 2: Implement validated config matching and atomic persistence.
+- [x] Task 1: Scaffold the Clang build and write failing routing/config tests.
+- [x] Task 2: Implement validated config matching and atomic persistence.
 
 ### Checkpoint: Foundation
 
-- [ ] Focused and full tests pass.
+- [x] Focused and full tests pass.
 - [ ] Core builds without warnings.
 
 ### Phase 2: Native Shell

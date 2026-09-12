@@ -3,8 +3,8 @@
 ## Task 1: Scaffold build and routing tests
 
 **Acceptance criteria:**
-- [ ] Makefile exposes core test, executable, and app-bundle targets.
-- [ ] Failing tests describe config decoding, matching, validation, and persistence.
+- [x] Makefile exposes core test, executable, and app-bundle targets.
+- [x] Failing tests describe config decoding, matching, validation, and persistence.
 
 **Verification:** `make test` fails on the first unimplemented routing behavior.
 
@@ -15,9 +15,9 @@
 ## Task 2: Implement routing core
 
 **Acceptance criteria:**
-- [ ] Valid JSON decodes and round-trips in stable order.
-- [ ] Exact, wildcard, precedence, fallback, and invalid-input cases pass.
-- [ ] Config saves atomically and reloads.
+- [x] Valid JSON decodes and round-trips in stable order.
+- [x] Exact, wildcard, precedence, fallback, and invalid-input cases pass.
+- [x] Config saves atomically and reloads.
 
 **Verification:** `make test`
 
@@ -27,7 +27,7 @@
 
 ## Checkpoint: Core
 
-- [ ] `make test` passes.
+- [x] `make test` passes.
 - [ ] `make build` passes.
 
 ## Task 3: Implement native routing shell

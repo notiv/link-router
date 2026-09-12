@@ -1,0 +1,54 @@
+SHELL := /bin/zsh
+CLANG := xcrun clang
+BUILD_DIR := .build/local
+APP_BUNDLE := dist/LinkRouter.app
+COMMON_FLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(BUILD_DIR)/ModuleCache -fobjc-weak -mmacosx-version-min=13.0 -Wall -Wextra -Werror -I Sources/Core -I Sources/App
+CORE_SOURCES := $(wildcard Sources/Core/*.m)
+APP_SOURCES := $(wildcard Sources/App/*.m)
+TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests
+
+.PHONY: all build test app run clean
+
+all: test app
+
+build: $(BUILD_DIR)/LinkRouter
+
+test: $(TEST_BINARIES)
+	$(BUILD_DIR)/LRConfigurationTests
+	$(BUILD_DIR)/LRRouterTests
+	$(BUILD_DIR)/LRLaunchPlanTests
+	$(BUILD_DIR)/LRConfigStoreTests
+
+test-config: $(BUILD_DIR)/LRConfigurationTests
+	$(BUILD_DIR)/LRConfigurationTests
+
+test-router: $(BUILD_DIR)/LRRouterTests
+	$(BUILD_DIR)/LRRouterTests
+
+test-launch-plan: $(BUILD_DIR)/LRLaunchPlanTests
+	$(BUILD_DIR)/LRLaunchPlanTests
+
+test-store: $(BUILD_DIR)/LRConfigStoreTests
+	$(BUILD_DIR)/LRConfigStoreTests
+
+app: $(APP_BUNDLE)
+
+run: app
+	open $(APP_BUNDLE)
+
+$(BUILD_DIR)/%Tests: Tests/%Tests.m Tests/LRTestSupport.h $(CORE_SOURCES)
+	mkdir -p $(BUILD_DIR)
+	$(CLANG) $(COMMON_FLAGS) $< $(CORE_SOURCES) -framework Foundation -o $@
+
+$(BUILD_DIR)/LinkRouter: $(APP_SOURCES) $(CORE_SOURCES)
+	mkdir -p $(BUILD_DIR)
+	$(CLANG) $(COMMON_FLAGS) $(APP_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
+
+$(APP_BUNDLE): $(BUILD_DIR)/LinkRouter Packaging/Info.plist
+	mkdir -p $(APP_BUNDLE)/Contents/MacOS
+	cp $(BUILD_DIR)/LinkRouter $(APP_BUNDLE)/Contents/MacOS/LinkRouter
+	cp Packaging/Info.plist $(APP_BUNDLE)/Contents/Info.plist
+	codesign --force --sign - $(APP_BUNDLE)
+
+clean:
+	rm -rf $(BUILD_DIR) $(APP_BUNDLE)
