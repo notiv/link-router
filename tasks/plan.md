@@ -22,17 +22,17 @@ Build a dependency-free native macOS menu-bar browser router with a JSON config 
 ### Checkpoint: Foundation
 
 - [x] Focused and full tests pass.
-- [ ] Core builds without warnings.
+- [x] Core builds without warnings.
 
 ### Phase 2: Native Shell
 
-- [ ] Task 3: Add browser launch planning and the macOS URL-handling menu-bar shell.
-- [ ] Task 4: Add Info.plist and reproducible Makefile `.app` packaging.
+- [x] Task 3: Add browser launch planning and the macOS URL-handling menu-bar shell.
+- [x] Task 4: Add Info.plist and reproducible Makefile `.app` packaging.
 
 ### Checkpoint: Native Shell
 
-- [ ] Bundle metadata declares HTTP/HTTPS and `LSUIElement`.
-- [ ] Packaged app launches and remains running as a menu-bar app.
+- [x] Bundle metadata declares HTTP/HTTPS and `LSUIElement`.
+- [x] Packaged app launches and remains running as a menu-bar app.
 
 ### Phase 3: Rule Editor and Handoff
 

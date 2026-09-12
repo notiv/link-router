@@ -28,14 +28,14 @@
 ## Checkpoint: Core
 
 - [x] `make test` passes.
-- [ ] `make build` passes.
+- [x] `make build` passes.
 
 ## Task 3: Implement native routing shell
 
 **Acceptance criteria:**
-- [ ] App delegate receives HTTP/HTTPS URLs.
-- [ ] Safari and Chrome profile targets use safe, explicit launch paths.
-- [ ] Menu exposes status and default-browser action.
+- [x] App delegate receives HTTP/HTTPS URLs.
+- [x] Safari and Chrome profile targets use safe, explicit launch paths.
+- [x] Menu exposes status and default-browser action.
 
 **Verification:** `make test` and `make build`
 
@@ -46,8 +46,8 @@
 ## Task 4: Package the app
 
 **Acceptance criteria:**
-- [ ] Script creates an ad-hoc-signed `dist/LinkRouter.app`.
-- [ ] Bundle registers `http` and `https` and runs as an agent app.
+- [x] Makefile creates an ad-hoc-signed `dist/LinkRouter.app`.
+- [x] Bundle registers `http` and `https` and runs as an agent app.
 
 **Verification:** `make app` plus `plutil` and `codesign` checks
 
@@ -57,8 +57,8 @@
 
 ## Checkpoint: Native Shell
 
-- [ ] App bundle builds and launches without an immediate crash.
-- [ ] No default browser setting is changed during verification.
+- [x] App bundle builds and launches without an immediate crash.
+- [x] No default browser setting is changed during verification.
 
 ## Task 5: Add rule editor
 

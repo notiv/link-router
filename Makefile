@@ -31,7 +31,12 @@ test-launch-plan: $(BUILD_DIR)/LRLaunchPlanTests
 test-store: $(BUILD_DIR)/LRConfigStoreTests
 	$(BUILD_DIR)/LRConfigStoreTests
 
-app: $(APP_BUNDLE)
+app: build Packaging/Info.plist
+	mkdir -p $(APP_BUNDLE)/Contents/MacOS
+	cp $(BUILD_DIR)/LinkRouter $(APP_BUNDLE)/Contents/MacOS/LinkRouter
+	cp Packaging/Info.plist $(APP_BUNDLE)/Contents/Info.plist
+	plutil -lint $(APP_BUNDLE)/Contents/Info.plist
+	codesign --force --sign - --timestamp=none $(APP_BUNDLE)
 
 run: app
 	open $(APP_BUNDLE)
@@ -43,12 +48,6 @@ $(BUILD_DIR)/%Tests: Tests/%Tests.m Tests/LRTestSupport.h $(CORE_SOURCES)
 $(BUILD_DIR)/LinkRouter: $(APP_SOURCES) $(CORE_SOURCES)
 	mkdir -p $(BUILD_DIR)
 	$(CLANG) $(COMMON_FLAGS) $(APP_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
-
-$(APP_BUNDLE): $(BUILD_DIR)/LinkRouter Packaging/Info.plist
-	mkdir -p $(APP_BUNDLE)/Contents/MacOS
-	cp $(BUILD_DIR)/LinkRouter $(APP_BUNDLE)/Contents/MacOS/LinkRouter
-	cp Packaging/Info.plist $(APP_BUNDLE)/Contents/Info.plist
-	codesign --force --sign - $(APP_BUNDLE)
 
 clean:
 	rm -rf $(BUILD_DIR) $(APP_BUNDLE)
