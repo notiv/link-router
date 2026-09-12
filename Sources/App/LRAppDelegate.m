@@ -2,6 +2,7 @@
 
 #import "LRBrowserLauncher.h"
 #import "LRConfigStore.h"
+#import "LRConfigWindowController.h"
 #import "LRRouting.h"
 
 @interface LRAppDelegate ()
@@ -11,6 +12,7 @@
 @property(nonatomic, strong) id<LRBrowserLaunching> browserLauncher;
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
+@property(nonatomic, strong) LRConfigWindowController *configWindowController;
 @end
 
 @implementation LRAppDelegate
@@ -30,6 +32,9 @@
     (void)notification;
     [self buildStatusMenu];
     [self loadConfiguration];
+    if ([NSProcessInfo.processInfo.arguments containsObject:@"--show-editor"]) {
+        [self openRuleEditor:nil];
+    }
 }
 
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)URLs {
@@ -56,9 +61,12 @@
     [menu addItemWithTitle:@"Set as Default Browser…"
                     action:@selector(setAsDefaultBrowser:)
              keyEquivalent:@""];
+    [menu addItemWithTitle:@"Configure Rules…"
+                    action:@selector(openRuleEditor:)
+             keyEquivalent:@","];
     [menu addItemWithTitle:@"Open Config File…"
                     action:@selector(openConfigFile:)
-             keyEquivalent:@","];
+             keyEquivalent:@""];
     [menu addItemWithTitle:@"Reload Config"
                     action:@selector(reloadConfig:)
              keyEquivalent:@"r"];
@@ -155,6 +163,30 @@
     if (![NSWorkspace.sharedWorkspace openURL:self.configStore.configURL]) {
         [self setStatus:@"Could not open the config file."];
     }
+}
+
+- (void)openRuleEditor:(id)sender {
+    (void)sender;
+    if (self.configWindowController == nil) {
+        __weak typeof(self) weakSelf = self;
+        self.configWindowController = [[LRConfigWindowController alloc]
+            initWithConfigStore:self.configStore
+             configurationSaved:^(LRRouterConfiguration *configuration) {
+                 NSError *error = nil;
+                 LRRouter *router = [[LRRouter alloc] initWithConfiguration:configuration error:&error];
+                 if (router == nil) {
+                     [weakSelf setStatus:[@"Config error: "
+                                             stringByAppendingString:error.localizedDescription]];
+                     return;
+                 }
+                 weakSelf.configuration = configuration;
+                 weakSelf.router = router;
+                 [weakSelf setStatus:[NSString stringWithFormat:@"Saved — %lu rule%@",
+                                                                 (unsigned long)configuration.rules.count,
+                                                                 configuration.rules.count == 1 ? @"" : @"s"]];
+             }];
+    }
+    [self.configWindowController showEditor];
 }
 
 - (void)reloadConfig:(id)sender {

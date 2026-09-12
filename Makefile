@@ -5,7 +5,7 @@ APP_BUNDLE := dist/LinkRouter.app
 COMMON_FLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(BUILD_DIR)/ModuleCache -fobjc-weak -mmacosx-version-min=13.0 -Wall -Wextra -Werror -I Sources/Core -I Sources/App
 CORE_SOURCES := $(wildcard Sources/Core/*.m)
 APP_SOURCES := $(wildcard Sources/App/*.m)
-TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests
+TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests $(BUILD_DIR)/LRRuleDraftTests
 
 .PHONY: all build test app run clean
 
@@ -18,6 +18,7 @@ test: $(TEST_BINARIES)
 	$(BUILD_DIR)/LRRouterTests
 	$(BUILD_DIR)/LRLaunchPlanTests
 	$(BUILD_DIR)/LRConfigStoreTests
+	$(BUILD_DIR)/LRRuleDraftTests
 
 test-config: $(BUILD_DIR)/LRConfigurationTests
 	$(BUILD_DIR)/LRConfigurationTests
@@ -30,6 +31,9 @@ test-launch-plan: $(BUILD_DIR)/LRLaunchPlanTests
 
 test-store: $(BUILD_DIR)/LRConfigStoreTests
 	$(BUILD_DIR)/LRConfigStoreTests
+
+test-rule-draft: $(BUILD_DIR)/LRRuleDraftTests
+	$(BUILD_DIR)/LRRuleDraftTests
 
 app: build Packaging/Info.plist
 	mkdir -p $(APP_BUNDLE)/Contents/MacOS

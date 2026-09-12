@@ -63,9 +63,9 @@
 ## Task 5: Add rule editor
 
 **Acceptance criteria:**
-- [ ] User can edit fallback and ordered rules with native controls.
-- [ ] Validation is visible and only valid state is persisted.
-- [ ] Saved changes affect routing immediately.
+- [x] User can edit fallback and ordered rules with native controls.
+- [x] Validation is visible and only valid state is persisted.
+- [x] Saved changes affect routing immediately.
 
 **Verification:** `make test`, `make build`, and manual editor smoke test
 

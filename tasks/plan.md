@@ -36,7 +36,7 @@ Build a dependency-free native macOS menu-bar browser router with a JSON config 
 
 ### Phase 3: Rule Editor and Handoff
 
-- [ ] Task 5: Add the native fallback/rule editor with visible validation and save state.
+- [x] Task 5: Add the native fallback/rule editor with visible validation and save state.
 - [ ] Task 6: Document configuration, build, installation, and verification.
 
 ### Checkpoint: Complete
