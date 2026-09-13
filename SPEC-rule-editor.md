@@ -47,6 +47,7 @@ The UI uses system colors, spacing, typography, and keyboard-accessible native c
 
 ## Success Criteria
 
+- Opening LinkRouter directly presents the editor, and reopening the running app restores it.
 - The menu opens a dedicated configuration window.
 - The user can change the fallback, add/delete/reorder rules, edit host patterns, select Safari or Chrome, and set a Chrome profile.
 - Save is disabled or fails visibly when validation fails.

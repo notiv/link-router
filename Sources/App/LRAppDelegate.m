@@ -34,6 +34,25 @@
     [self loadConfiguration];
 }
 
+- (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender {
+    (void)sender;
+    return YES;
+}
+
+- (BOOL)applicationOpenUntitledFile:(NSApplication *)sender {
+    (void)sender;
+    [self openRuleEditor:nil];
+    return YES;
+}
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender
+                    hasVisibleWindows:(BOOL)hasVisibleWindows {
+    (void)sender;
+    (void)hasVisibleWindows;
+    [self openRuleEditor:nil];
+    return NO;
+}
+
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)URLs {
     (void)application;
     for (NSURL *URL in URLs) {

@@ -6,9 +6,9 @@ COMMON_FLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(BUILD_DIR)/ModuleCac
 CORE_SOURCES := $(wildcard Sources/Core/*.m)
 APP_SOURCES := $(wildcard Sources/App/*.m)
 APP_LIBRARY_SOURCES := $(filter-out Sources/App/main.m,$(APP_SOURCES))
-TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests $(BUILD_DIR)/LRRuleDraftTests $(BUILD_DIR)/LRIntegrationTests $(BUILD_DIR)/LRAppDelegateTests
+TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests $(BUILD_DIR)/LRRuleDraftTests $(BUILD_DIR)/LRIntegrationTests $(BUILD_DIR)/LRLaunchLifecycleTests $(BUILD_DIR)/LRAppDelegateTests
 
-.PHONY: all build test test-config test-router test-launch-plan test-store test-rule-draft test-integration test-app-delegate app verify verify-bundle run clean
+.PHONY: all build test test-config test-router test-launch-plan test-store test-rule-draft test-integration test-launch-lifecycle test-app-delegate app verify verify-bundle run clean
 
 all: test app
 
@@ -23,6 +23,7 @@ test: $(TEST_BINARIES)
 	$(BUILD_DIR)/LRConfigStoreTests
 	$(BUILD_DIR)/LRRuleDraftTests
 	$(BUILD_DIR)/LRIntegrationTests
+	$(BUILD_DIR)/LRLaunchLifecycleTests
 	$(BUILD_DIR)/LRAppDelegateTests
 
 test-config: $(BUILD_DIR)/LRConfigurationTests
@@ -42,6 +43,9 @@ test-rule-draft: $(BUILD_DIR)/LRRuleDraftTests
 
 test-integration: $(BUILD_DIR)/LRIntegrationTests
 	$(BUILD_DIR)/LRIntegrationTests
+
+test-launch-lifecycle: $(BUILD_DIR)/LRLaunchLifecycleTests
+	$(BUILD_DIR)/LRLaunchLifecycleTests
 
 test-app-delegate: $(BUILD_DIR)/LRAppDelegateTests
 	$(BUILD_DIR)/LRAppDelegateTests
@@ -69,6 +73,10 @@ $(BUILD_DIR)/%Tests: Tests/%Tests.m Tests/LRTestSupport.h $(CORE_SOURCES)
 	$(CLANG) $(COMMON_FLAGS) $< $(CORE_SOURCES) -framework Foundation -o $@
 
 $(BUILD_DIR)/LRAppDelegateTests: Tests/LRAppDelegateTests.m Tests/LRTestSupport.h $(APP_LIBRARY_SOURCES) $(CORE_SOURCES)
+	mkdir -p $(BUILD_DIR)
+	$(CLANG) $(COMMON_FLAGS) $< $(APP_LIBRARY_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
+
+$(BUILD_DIR)/LRLaunchLifecycleTests: Tests/LRLaunchLifecycleTests.m Tests/LRTestSupport.h $(APP_LIBRARY_SOURCES) $(CORE_SOURCES)
 	mkdir -p $(BUILD_DIR)
 	$(CLANG) $(COMMON_FLAGS) $< $(APP_LIBRARY_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
 

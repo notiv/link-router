@@ -23,6 +23,8 @@ open dist/LinkRouter.app
 
 To keep the app somewhere permanent, quit it and copy `dist/LinkRouter.app` to `/Applications` before opening it again. Moving it after selecting it as the default browser may make macOS point at the old location.
 
+Opening LinkRouter directly presents the rule editor. After closing that window, the app continues running from its branching-arrow menu-bar icon so it can route links. Opening the app again brings the editor back.
+
 ## Configure routing
 
 1. Click LinkRouter's branching-arrow icon in the menu bar.
