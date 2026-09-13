@@ -76,8 +76,8 @@
 ## Task 6: Document and final-verify
 
 **Acceptance criteria:**
-- [ ] README explains build, install, default-browser setup, config, and profiles.
-- [ ] All automated and bundle checks pass from a clean tree.
+- [x] README explains build, install, default-browser setup, config, and profiles.
+- [x] All automated and bundle checks pass from a clean tree.
 
 **Verification:** follow every README command and inspect final Git diff/status
 
@@ -87,6 +87,6 @@
 
 ## Checkpoint: Complete
 
-- [ ] All specs' success criteria are satisfied.
-- [ ] Tests and release build pass.
-- [ ] Runtime, accessibility, and security checks pass.
+- [x] All specs' success criteria are satisfied.
+- [x] Tests and release build pass.
+- [x] Runtime, accessibility, and security checks pass.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build a dependency-free native macOS menu-bar browser router with a JSON config and a SwiftUI rule editor. The implementation is risk-first: prove matching, persistence, and safe launch plans before adding platform integration and UI.
+Build a dependency-free native macOS menu-bar browser router with a JSON config and an AppKit rule editor. The implementation is risk-first: prove matching, persistence, and safe launch plans before adding platform integration and UI.
 
 ## Architecture Decisions
 
@@ -37,13 +37,13 @@ Build a dependency-free native macOS menu-bar browser router with a JSON config 
 ### Phase 3: Rule Editor and Handoff
 
 - [x] Task 5: Add the native fallback/rule editor with visible validation and save state.
-- [ ] Task 6: Document configuration, build, installation, and verification.
+- [x] Task 6: Document configuration, build, installation, and verification.
 
 ### Checkpoint: Complete
 
-- [ ] Full tests and release build pass.
-- [ ] Editor save/reload and a non-destructive routing dry run work end-to-end.
-- [ ] Security and accessibility review finds no blocking issue.
+- [x] Full tests and release build pass.
+- [x] Editor save/reload and a non-destructive routing dry run work end-to-end.
+- [x] Security and accessibility review finds no blocking issue.
 
 ## Risks and Mitigations
 
@@ -53,7 +53,7 @@ Build a dependency-free native macOS menu-bar browser router with a JSON config 
 | App cannot become an HTTP handler | High | Declare both schemes in Info.plist and use the macOS 12+ `NSWorkspace` setter |
 | Config edits corrupt the only file | High | Validate before saving and use atomic file replacement |
 | Routing loops back into LinkRouter | High | Resolve Safari/Chrome explicitly rather than using the system default opener |
-| Full Xcode is unavailable | Medium | Use SwiftPM plus a deterministic app-bundle packaging script |
+| Full Xcode is unavailable | Medium | Compile Objective-C with Apple Clang and assemble the app bundle deterministically |
 
 ## Open Questions
 

@@ -1,0 +1,23 @@
+{
+  "default" : {
+    "app" : "Safari"
+  },
+  "rules" : [
+    {
+      "app" : "Google Chrome",
+      "hosts" : [
+        "*.example.com",
+        "console.cloud.google.com"
+      ],
+      "name" : "Work",
+      "profile" : "Profile 1"
+    },
+    {
+      "app" : "Safari",
+      "hosts" : [
+        "news.example.org"
+      ],
+      "name" : "Reading"
+    }
+  ]
+}
