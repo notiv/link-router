@@ -58,6 +58,9 @@ static void TestDoesNotOverwriteInvalidExistingConfig(void) {
 
     LRAssert([store ensureDefaultConfigExists:&error], "existing config should be left in place");
     LRAssert([store loadConfiguration:&error] == nil, "invalid existing config should fail visibly");
+    error = nil;
+    LRAssert(![store saveConfiguration:LRRouterConfiguration.defaultConfiguration error:&error],
+             "saving should refuse to replace an invalid existing config");
     NSData *unchanged = [NSData dataWithContentsOfURL:configURL options:0 error:nil];
     LRAssert([unchanged isEqualToData:invalid], "invalid existing config must not be overwritten");
     [NSFileManager.defaultManager removeItemAtURL:directory error:nil];

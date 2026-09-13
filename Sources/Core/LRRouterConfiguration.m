@@ -217,6 +217,10 @@ static BOOL LRValidateHostPattern(NSString *pattern, NSString *location, NSError
     if (data == nil) {
         return nil;
     }
+    if (data.length + 1 > LRMaximumConfigBytes) {
+        LRSetConfigurationError(error, @"The encoded config would be larger than 1 MB.");
+        return nil;
+    }
     NSMutableData *terminated = [data mutableCopy];
     [terminated appendBytes:"\n" length:1];
     return terminated;

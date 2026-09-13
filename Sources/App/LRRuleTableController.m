@@ -103,17 +103,17 @@ static NSString *const LRProfileColumn = @"profile";
     [self updateButtonState];
 }
 
+- (void)commitCurrentEditing {
+    [self.view.window makeFirstResponder:nil];
+}
+
 - (NSArray<LRRoutingRule *> *)routingRules {
-    [self commitEditing];
+    [self commitCurrentEditing];
     NSMutableArray<LRRoutingRule *> *rules = [NSMutableArray arrayWithCapacity:self.drafts.count];
     for (LRRuleDraft *draft in self.drafts) {
         [rules addObject:draft.routingRule];
     }
     return rules;
-}
-
-- (void)commitEditing {
-    [self.view.window makeFirstResponder:nil];
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
@@ -186,7 +186,7 @@ static NSString *const LRProfileColumn = @"profile";
 
 - (void)addRule:(id)sender {
     (void)sender;
-    [self commitEditing];
+    [self commitCurrentEditing];
     [self.drafts addObject:LRRuleDraft.newDraft];
     [self.tableView reloadData];
     NSInteger row = (NSInteger)self.drafts.count - 1;
@@ -197,6 +197,7 @@ static NSString *const LRProfileColumn = @"profile";
 
 - (void)removeRule:(id)sender {
     (void)sender;
+    [self commitCurrentEditing];
     NSInteger row = self.tableView.selectedRow;
     if (row < 0) { return; }
     [self.drafts removeObjectAtIndex:(NSUInteger)row];
@@ -215,7 +216,7 @@ static NSString *const LRProfileColumn = @"profile";
 }
 
 - (void)moveSelectedRuleBy:(NSInteger)offset {
-    [self commitEditing];
+    [self commitCurrentEditing];
     NSInteger source = self.tableView.selectedRow;
     NSInteger destination = source + offset;
     if (source < 0 || destination < 0 || destination >= (NSInteger)self.drafts.count) { return; }

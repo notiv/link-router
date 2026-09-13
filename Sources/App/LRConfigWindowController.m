@@ -55,12 +55,13 @@
     self.defaultBrowserPicker.target = self;
     self.defaultBrowserPicker.action = @selector(defaultBrowserChanged:);
     [self.defaultBrowserPicker setAccessibilityLabel:@"Fallback browser"];
+    NSTextField *defaultProfileLabel = [NSTextField labelWithString:@"Chrome profile"];
     self.defaultProfileField = [[NSTextField alloc] initWithFrame:NSZeroRect];
     self.defaultProfileField.placeholderString = @"Chrome profile: Default or Profile 1";
     [self.defaultProfileField setAccessibilityLabel:@"Fallback Chrome profile"];
     [self.defaultProfileField.widthAnchor constraintGreaterThanOrEqualToConstant:230].active = YES;
     NSStackView *fallback = [NSStackView stackViewWithViews:@[
-        defaultLabel, self.defaultBrowserPicker, self.defaultProfileField
+        defaultLabel, self.defaultBrowserPicker, defaultProfileLabel, self.defaultProfileField
     ]];
     fallback.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     fallback.alignment = NSLayoutAttributeCenterY;
@@ -135,7 +136,6 @@
 
 - (void)save:(id)sender {
     (void)sender;
-    [self.ruleTableController commitEditing];
     LRBrowserApplication application =
         (LRBrowserApplication)self.defaultBrowserPicker.indexOfSelectedItem;
     LRBrowserTarget *fallback = [LRBrowserTarget targetWithApplication:application
@@ -171,14 +171,19 @@
         self.defaultBrowserPicker.indexOfSelectedItem == LRBrowserApplicationChrome;
 }
 
+- (void)updateStatusLabel:(NSString *)message color:(NSColor *)color {
+    self.statusLabel.textColor = color;
+    self.statusLabel.stringValue = message;
+    NSAccessibilityPostNotification(self.statusLabel, NSAccessibilityValueChangedNotification);
+}
+
 - (void)showError:(NSString *)message {
-    self.statusLabel.textColor = NSColor.systemRedColor;
-    self.statusLabel.stringValue = [@"Error: " stringByAppendingString:message ?: @"Unknown error"];
+    [self updateStatusLabel:[@"Error: " stringByAppendingString:message ?: @"Unknown error"]
+                      color:NSColor.systemRedColor];
 }
 
 - (void)showStatus:(NSString *)message {
-    self.statusLabel.textColor = NSColor.secondaryLabelColor;
-    self.statusLabel.stringValue = message;
+    [self updateStatusLabel:message color:NSColor.secondaryLabelColor];
 }
 
 @end

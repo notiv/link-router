@@ -56,6 +56,21 @@
     if (data == nil || ![self ensureParentDirectory:error]) {
         return NO;
     }
+    if ([NSFileManager.defaultManager fileExistsAtPath:self.configURL.path]) {
+        NSError *existingError = nil;
+        if ([self loadConfiguration:&existingError] == nil) {
+            if (error != NULL) {
+                *error = [NSError errorWithDomain:LRRoutingErrorDomain
+                                             code:LRRoutingErrorInvalidConfiguration
+                                         userInfo:@{
+                                             NSLocalizedDescriptionKey:
+                                                 @"Refusing to replace the malformed config file. Open the JSON file to repair it first.",
+                                             NSUnderlyingErrorKey: existingError,
+                                         }];
+            }
+            return NO;
+        }
+    }
     if (![data writeToURL:self.configURL options:NSDataWritingAtomic error:error]) {
         return NO;
     }

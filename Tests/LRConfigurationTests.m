@@ -64,11 +64,41 @@ static void TestRoundTrip(void) {
              "round trip should preserve rule order and values");
 }
 
+static void TestEncodedConfigurationSizeLimit(void) {
+    NSString *label63 = [@"a" stringByPaddingToLength:63 withString:@"a" startingAtIndex:0];
+    NSString *label61 = [@"b" stringByPaddingToLength:61 withString:@"b" startingAtIndex:0];
+    NSString *longHost = [@[label63, label63, label63, label61] componentsJoinedByString:@"."];
+    NSMutableArray<LRRoutingRule *> *rules = [NSMutableArray array];
+    for (NSUInteger ruleIndex = 0; ruleIndex < 50; ruleIndex += 1) {
+        NSMutableArray<NSString *> *hosts = [NSMutableArray array];
+        for (NSUInteger hostIndex = 0; hostIndex < 100; hostIndex += 1) {
+            [hosts addObject:longHost];
+        }
+        [rules addObject:[LRRoutingRule
+            ruleWithName:[NSString stringWithFormat:@"Rule %lu", (unsigned long)ruleIndex]
+                   hosts:hosts
+                  target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                                         profile:nil]]];
+    }
+    LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                                              profile:nil]
+                         rules:rules];
+    NSError *error = nil;
+    LRAssert([configuration JSONDataWithError:&error] == nil,
+             "the writer should reject a config larger than the reader accepts");
+    LRAssert(error.code == LRRoutingErrorInvalidConfiguration,
+             "an oversized encoded config should return a configuration error");
+    LRAssert([error.localizedDescription containsString:@"larger than 1 MB"],
+             "the oversized config error should explain the shared size limit");
+}
+
 int main(void) {
     @autoreleasepool {
         TestConfigurationDecoding();
         TestValidation();
         TestRoundTrip();
+        TestEncodedConfigurationSizeLimit();
         return LRFinishTests();
     }
 }

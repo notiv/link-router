@@ -32,9 +32,6 @@
     (void)notification;
     [self buildStatusMenu];
     [self loadConfiguration];
-    if ([NSProcessInfo.processInfo.arguments containsObject:@"--show-editor"]) {
-        [self openRuleEditor:nil];
-    }
 }
 
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)URLs {
@@ -58,20 +55,27 @@
     self.statusMenuItem.enabled = NO;
     [menu addItem:self.statusMenuItem];
     [menu addItem:NSMenuItem.separatorItem];
-    [menu addItemWithTitle:@"Set as Default Browser…"
-                    action:@selector(setAsDefaultBrowser:)
-             keyEquivalent:@""];
-    [menu addItemWithTitle:@"Configure Rules…"
-                    action:@selector(openRuleEditor:)
-             keyEquivalent:@","];
-    [menu addItemWithTitle:@"Open Config File…"
-                    action:@selector(openConfigFile:)
-             keyEquivalent:@""];
-    [menu addItemWithTitle:@"Reload Config"
-                    action:@selector(reloadConfig:)
-             keyEquivalent:@"r"];
+    NSMenuItem *defaultBrowserItem = [menu addItemWithTitle:@"Set as Default Browser…"
+                                                     action:@selector(setAsDefaultBrowser:)
+                                              keyEquivalent:@""];
+    defaultBrowserItem.target = self;
+    NSMenuItem *configureItem = [menu addItemWithTitle:@"Configure Rules…"
+                                                action:@selector(openRuleEditor:)
+                                         keyEquivalent:@","];
+    configureItem.target = self;
+    NSMenuItem *openConfigItem = [menu addItemWithTitle:@"Open Config File…"
+                                                 action:@selector(openConfigFile:)
+                                          keyEquivalent:@""];
+    openConfigItem.target = self;
+    NSMenuItem *reloadItem = [menu addItemWithTitle:@"Reload Config"
+                                             action:@selector(reloadConfig:)
+                                      keyEquivalent:@"r"];
+    reloadItem.target = self;
     [menu addItem:NSMenuItem.separatorItem];
-    [menu addItemWithTitle:@"Quit LinkRouter" action:@selector(quit:) keyEquivalent:@"q"];
+    NSMenuItem *quitItem = [menu addItemWithTitle:@"Quit LinkRouter"
+                                           action:@selector(quit:)
+                                    keyEquivalent:@"q"];
+    quitItem.target = self;
     self.statusItem.menu = menu;
 }
 
@@ -131,25 +135,25 @@
     [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
                                       toOpenURLsWithScheme:@"http"
                                                completionHandler:^(NSError *HTTPError) {
-        if (HTTPError != nil) {
-            dispatch_async(dispatch_get_main_queue(), ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (HTTPError != nil) {
                 [self setStatus:[@"Default-browser error: "
                                     stringByAppendingString:HTTPError.localizedDescription]];
-            });
-            return;
-        }
-        [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
-                                          toOpenURLsWithScheme:@"https"
-                                                   completionHandler:^(NSError *HTTPSError) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (HTTPSError != nil) {
-                    [self setStatus:[@"Default-browser error: "
-                                        stringByAppendingString:HTTPSError.localizedDescription]];
-                } else {
-                    [self setStatus:@"LinkRouter is the default web browser."];
-                }
-            });
-        }];
+                return;
+            }
+            [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
+                                              toOpenURLsWithScheme:@"https"
+                                                       completionHandler:^(NSError *HTTPSError) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (HTTPSError != nil) {
+                        [self setStatus:[@"Default-browser error: "
+                                            stringByAppendingString:HTTPSError.localizedDescription]];
+                    } else {
+                        [self setStatus:@"LinkRouter is the default web browser."];
+                    }
+                });
+            }];
+        });
     }];
 }
 

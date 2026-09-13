@@ -13,6 +13,7 @@ static NSUInteger LRFailures = 0;
 static int LRFinishTests(void) {
     if (LRFailures == 0) {
         printf("PASS\n");
+        fflush(stdout);
         return 0;
     }
     fprintf(stderr, "FAIL: %lu assertion(s)\n", (unsigned long)LRFailures);

@@ -8,7 +8,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)setRoutingRules:(NSArray<LRRoutingRule *> *)rules;
 - (NSArray<LRRoutingRule *> *)routingRules;
-- (void)commitEditing;
 
 @end
 
