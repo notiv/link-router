@@ -18,9 +18,7 @@
 @end
 
 @interface LRRuleTableController (Testing)
-- (NSView *)tableView:(NSTableView *)tableView
-    viewForTableColumn:(NSTableColumn *)tableColumn
-                   row:(NSInteger)row;
+- (void)domainModeChanged:(NSSegmentedControl *)sender;
 - (void)privateChanged:(NSButton *)sender;
 @end
 
@@ -100,17 +98,7 @@ static void TestRuleTablePrivateControlUpdatesChromeTarget(void) {
               target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome profile:nil]];
     [controller setRoutingRules:@[rule]];
 
-    NSTableView *tableView = [controller valueForKey:@"tableView"];
-    NSTableColumn *privateColumn = nil;
-    for (NSTableColumn *column in tableView.tableColumns) {
-        if ([column.identifier isEqualToString:@"private"]) {
-            privateColumn = column;
-            break;
-        }
-    }
-    NSButton *privateButton = (NSButton *)[controller tableView:tableView
-                                            viewForTableColumn:privateColumn
-                                                           row:0];
+    NSButton *privateButton = [controller valueForKey:@"privateButton"];
     LRAssert(privateButton != nil && privateButton.enabled,
              "a Chrome rule should expose an enabled private control");
     privateButton.state = NSControlStateValueOn;
@@ -120,11 +108,46 @@ static void TestRuleTablePrivateControlUpdatesChromeTarget(void) {
              "the private control should update the Chrome target");
 }
 
+static void TestRulesEditorPresentsWildcardHostsAsDomainModes(void) {
+    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
+    (void)controller.view;
+    LRRoutingRule *rule = [LRRoutingRule
+        ruleWithName:@"Work"
+               hosts:@[@"*.example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome profile:nil]];
+    [controller setRoutingRules:@[rule]];
+
+    NSArray<NSTextField *> *domainFields = [controller valueForKey:@"domainFields"];
+    NSArray<NSSegmentedControl *> *modeControls = [controller valueForKey:@"domainModeControls"];
+    LRAssert([domainFields.firstObject.stringValue isEqualToString:@"example.com"],
+             "the domain field should omit the wildcard prefix");
+    LRAssert(modeControls.firstObject.selectedSegment == 1,
+             "a wildcard host should select the subdomains matching mode");
+
+    modeControls.firstObject.selectedSegment = 0;
+    [controller domainModeChanged:modeControls.firstObject];
+    LRAssert([controller.routingRules.firstObject.hosts.firstObject isEqualToString:@"example.com"],
+             "switching to exact matching should remove the wildcard prefix");
+}
+
+static void TestRulesEditorUsesAReferenceStyleSidebar(void) {
+    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
+    (void)controller.view;
+    NSTableView *tableView = [controller valueForKey:@"tableView"];
+
+    LRAssert(tableView.headerView == nil,
+             "the redesigned rules editor should use a headerless sidebar list");
+    LRAssert(tableView.tableColumns.count == 1,
+             "the sidebar should present each route as one scannable item");
+}
+
 int main(void) {
     @autoreleasepool {
-        TestStatusMenuActionsHaveExplicitTargets();
+        TestRulesEditorUsesAReferenceStyleSidebar();
         TestEditorSaveReloadFlow();
         TestRuleTablePrivateControlUpdatesChromeTarget();
+        TestRulesEditorPresentsWildcardHostsAsDomainModes();
+        TestStatusMenuActionsHaveExplicitTargets();
         return LRFinishTests();
     }
 }
