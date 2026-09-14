@@ -18,7 +18,7 @@ Build the installer, open it, and drag LinkRouter to **Applications**:
 
 ```sh
 make installer
-open dist/LinkRouter-0.1.0.dmg
+open dist/LinkRouter-0.1.1.dmg
 ```
 
 The disk image contains `LinkRouter.app` and an **Applications** shortcut. The app uses the same original routing-fork mark in the menu bar and in its high-resolution Finder icon.
