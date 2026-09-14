@@ -116,14 +116,6 @@
                                                 action:@selector(openRuleEditor:)
                                          keyEquivalent:@","];
     configureItem.target = self;
-    NSMenuItem *openConfigItem = [menu addItemWithTitle:@"Open Config File…"
-                                                 action:@selector(openConfigFile:)
-                                          keyEquivalent:@""];
-    openConfigItem.target = self;
-    NSMenuItem *reloadItem = [menu addItemWithTitle:@"Reload Config"
-                                             action:@selector(reloadConfig:)
-                                      keyEquivalent:@"r"];
-    reloadItem.target = self;
     [menu addItem:NSMenuItem.separatorItem];
     NSMenuItem *quitItem = [menu addItemWithTitle:@"Quit LinkRouter"
                                            action:@selector(quit:)
@@ -279,18 +271,6 @@
     }];
 }
 
-- (void)openConfigFile:(id)sender {
-    (void)sender;
-    NSError *error = nil;
-    if (![self.configStore ensureDefaultConfigExists:&error]) {
-        [self setStatus:[@"Config error: " stringByAppendingString:error.localizedDescription]];
-        return;
-    }
-    if (![NSWorkspace.sharedWorkspace openURL:self.configStore.configURL]) {
-        [self setStatus:@"Could not open the config file."];
-    }
-}
-
 - (void)openRuleEditor:(id)sender {
     (void)sender;
     if (self.configWindowController == nil) {
@@ -313,11 +293,6 @@
              }];
     }
     [self.configWindowController showEditor];
-}
-
-- (void)reloadConfig:(id)sender {
-    (void)sender;
-    [self loadConfiguration];
 }
 
 - (void)quit:(id)sender {

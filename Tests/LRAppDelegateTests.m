@@ -156,7 +156,11 @@ static void TestStatusMenuActionsHaveExplicitTargets(void) {
         actionCount += 1;
         LRAssert(item.target == delegate, "every status-menu command should target the app delegate");
     }
-    LRAssert(actionCount == 6, "the status menu should expose six commands");
+    LRAssert(actionCount == 4, "the status menu should expose four focused commands");
+    LRAssert([menu itemWithTitle:@"Reload Config"] == nil,
+             "reloading should live in the settings window instead of the status menu");
+    LRAssert([menu itemWithTitle:@"Open Config File…"] == nil,
+             "opening JSON should live in the settings window instead of the status menu");
 }
 
 static NSMenuItem *StartAtLoginMenuItem(NSMenu *menu) {
