@@ -2,6 +2,8 @@
 
 LinkRouter is a small macOS menu-bar app that sends web links to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included graphical settings editor writes that file for you.
 
+![LinkRouter 0.2.0 showing ordered rules, subdomain matching, and a Chrome profile](Documentation/linkrouter-0.2.0.png)
+
 It follows the shape of the utility shown in [Thorsten Ball's LinkRouter post](https://x.com/thorstenball/status/2098327328845656224): first-match host rules, an explicit fallback, and Chrome profile routing.
 
 ## Requirements
@@ -46,7 +48,7 @@ To have LinkRouter available automatically, open its menu and enable **Start at 
 2. Choose **Configure Rules…**.
 3. Select **Unmatched links** in the sidebar and choose the fallback browser.
 4. Use **+** beside **Rules** to add a rule, then edit its name, domains, exact/subdomain matching mode, browser, and optional Chrome profile.
-5. Drag rule rows into priority order. Hover a rule to reveal its delete action.
+5. Drag rule rows into priority order. Select a rule to reveal its circled minus; hover over the minus to reveal **Delete**. Untouched new rules are removed without confirmation; configured or saved rules still ask for confirmation.
 6. Enable **Open in a private window** when a Chrome target should open in an Incognito window.
 7. Choose **Save**. New links use the saved rules immediately.
 
