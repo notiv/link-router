@@ -100,6 +100,7 @@ static void TestEditorUsesNativeLiquidGlassControls(void) {
         }];
 
     NSView *contentView = controller.window.contentView;
+    [contentView layoutSubtreeIfNeeded];
     NSVisualEffectView *sidebarMaterial = (NSVisualEffectView *)FindDescendantOfClass(
         contentView, NSVisualEffectView.class);
     LRAssert(FindDescendantOfClass(contentView, NSOutlineView.class) != nil,
@@ -111,6 +112,16 @@ static void TestEditorUsesNativeLiquidGlassControls(void) {
     LRAssert(sidebarMaterial.material == NSVisualEffectMaterialSidebar &&
                  sidebarMaterial.blendingMode == NSVisualEffectBlendingModeWithinWindow,
              "the sidebar should use an adaptive Finder-style semantic material");
+    NSOutlineView *otherRoutes = [controller valueForKeyPath:
+        @"rulesEditor.specialRoutesOutlineView"];
+    NSTableCellView *fallbackCell = [otherRoutes viewAtColumn:0 row:0 makeIfNecessary:YES];
+    NSTextField *statusLabel = [controller valueForKey:@"statusLabel"];
+    [fallbackCell layoutSubtreeIfNeeded];
+    NSRect fallbackFrame = [fallbackCell.textField convertRect:fallbackCell.textField.bounds
+                                                        toView:contentView];
+    NSRect statusFrame = [statusLabel convertRect:statusLabel.bounds toView:contentView];
+    LRAssert(ABS(NSMidY(fallbackFrame) - NSMidY(statusFrame)) < 0.5,
+             "Unmatched links and the action-bar status should align vertically");
     controller.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     NSString *appearanceName = [sidebarMaterial.effectiveAppearance
         bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
@@ -199,6 +210,8 @@ static void TestSidebarUsesInlineRuleManagement(void) {
              "the Rules heading should expose a compact inline add button");
     LRAssert(deleteButton != nil, "rule rows should own an inline Delete affordance");
     if (deleteButton != nil) {
+        NSButton *collapsedButton = [deleteButton valueForKey:@"collapsedButton"];
+        NSButton *expandedButton = [deleteButton valueForKey:@"expandedButton"];
         LRAssert(!deleteButton.hidden,
                  "the selected rule should clearly expose its remove control");
         NSPoint deleteCenter = [deleteButton convertPoint:
@@ -209,20 +222,55 @@ static void TestSidebarUsesInlineRuleManagement(void) {
         LRAssert(deleteButton.target == editor &&
                      deleteButton.action == NSSelectorFromString(@"removeRuleFromSidebar:"),
                  "the inline Delete affordance should be wired to rule removal");
+        NSEvent *hoverEvent = (NSEvent *)(id)NSNull.null;
+        [deleteButton mouseEntered:hoverEvent];
+        LRAssert(!collapsedButton.hidden && expandedButton.hidden,
+                 "Delete should wait briefly before expanding on hover");
+        [deleteButton mouseExited:hoverEvent];
+        [ruleCell layoutSubtreeIfNeeded];
+        CGFloat collapsedDeleteWidth = NSWidth(deleteButton.frame);
+        NSPoint collapsedTrailing = [collapsedButton convertPoint:
+            NSMakePoint(NSMaxX(collapsedButton.bounds), NSMidY(collapsedButton.bounds))
+                                                toView:rules];
         [deleteButton setExpanded:YES];
-        LRAssert([deleteButton.attributedTitle.string isEqualToString:@"Delete"],
+        LRAssert([expandedButton.title isEqualToString:@"Delete"] &&
+                     !expandedButton.hidden,
                  "hovering the selected rule's minus should reveal Delete");
-        LRAssert(deleteButton.bordered &&
-                     deleteButton.bezelStyle == NSBezelStyleAccessoryBarAction,
+        LRAssert(expandedButton.bordered &&
+                     expandedButton.bezelStyle == NSBezelStyleAccessoryBarAction,
                  "Delete should be a compact native button rather than bare text");
+        LRAssert(expandedButton.controlSize == NSControlSizeSmall &&
+                     expandedButton.alignment == NSTextAlignmentCenter,
+                 "Delete should use AppKit's centered small-button text metrics");
+        LRAssert(expandedButton.hasDestructiveAction,
+                 "the Delete button should expose its destructive role to AppKit");
+        LRAssert(expandedButton.bezelColor == nil,
+                 "the expanded Delete button should let AppKit choose its native surface color");
+        [ruleCell layoutSubtreeIfNeeded];
+        LRAssert(ABS(collapsedDeleteWidth - NSWidth(deleteButton.frame)) < 0.5,
+                 "the Delete reveal should remain inside one fixed final frame");
+        LRAssert(NSMaxX(deleteButton.frame) <= NSWidth(ruleCell.bounds) - 14.0,
+                 "the expanded Delete button should leave air before the selection edge");
+        NSPoint addTrailing = [addButton convertPoint:
+            NSMakePoint(NSMaxX(addButton.bounds), NSMidY(addButton.bounds))
+                                             toView:rules];
+        NSPoint deleteTrailing = [deleteButton convertPoint:
+            NSMakePoint(NSMaxX(deleteButton.bounds), NSMidY(deleteButton.bounds))
+                                                toView:rules];
+        LRAssert(ABS(addTrailing.x - deleteTrailing.x) < 0.5,
+                 "the expanded Delete button should share the Rules plus trailing guide");
+        LRAssert(ABS(collapsedTrailing.x - deleteTrailing.x) < 0.5,
+                 "the Delete transition should grow left from its final trailing edge");
         [deleteButton setExpanded:NO];
+        [ruleCell layoutSubtreeIfNeeded];
     }
     if (addButton != nil && deleteButton != nil) {
+        NSButton *collapsedButton = [deleteButton valueForKey:@"collapsedButton"];
         NSPoint addCenter = [addButton convertPoint:
             NSMakePoint(NSMidX(addButton.bounds), NSMidY(addButton.bounds))
                                              toView:rules];
-        NSPoint deleteCenter = [deleteButton convertPoint:
-            NSMakePoint(NSMidX(deleteButton.bounds), NSMidY(deleteButton.bounds))
+        NSPoint deleteCenter = [collapsedButton convertPoint:
+            NSMakePoint(NSMidX(collapsedButton.bounds), NSMidY(collapsedButton.bounds))
                                                    toView:rules];
         LRAssert(ABS(addCenter.x - deleteCenter.x) < 0.5,
                  "the selected rule's minus should align exactly beneath the Rules plus");

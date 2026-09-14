@@ -4,6 +4,7 @@
 
 static NSString *const LRRulesGroup = @"Rules";
 static NSString *const LRFallbackItem = @"Unmatched links";
+static const NSTimeInterval LRDeleteHoverDelay = 0.4;
 static NSPasteboardType const LRRulePasteboardType = @"com.linkrouter.rule-row";
 static NSUserInterfaceItemIdentifier const LRSidebarColumnIdentifier = @"Route";
 static NSUserInterfaceItemIdentifier const LRRuleCellIdentifier = @"RuleCell";
@@ -49,11 +50,69 @@ static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
 
 @interface LRHoverDeleteButton : NSButton
 @property(nonatomic, strong) NSTrackingArea *hoverTrackingArea;
-@property(nonatomic, strong) NSLayoutConstraint *widthConstraint;
+@property(nonatomic, strong) NSTimer *hoverTimer;
+@property(nonatomic, strong) NSButton *collapsedButton;
+@property(nonatomic, strong) NSButton *expandedButton;
+@property(nonatomic) BOOL expanded;
+@property(nonatomic) BOOL configured;
+@property(nonatomic) BOOL animating;
 - (void)setExpanded:(BOOL)expanded;
 @end
 
 @implementation LRHoverDeleteButton
+
+- (instancetype)initWithFrame:(NSRect)frameRect {
+    self = [super initWithFrame:frameRect];
+    if (self) {
+        self.bordered = NO;
+        self.title = @"";
+        self.wantsLayer = YES;
+        self.layer.masksToBounds = YES;
+
+        _collapsedButton = [NSButton
+            buttonWithImage:[NSImage imageWithSystemSymbolName:@"minus.circle"
+                                      accessibilityDescription:@"Delete rule"]
+                     target:nil
+                     action:nil];
+        _collapsedButton.bordered = NO;
+        _collapsedButton.controlSize = NSControlSizeSmall;
+        _collapsedButton.contentTintColor = [NSColor.whiteColor colorWithAlphaComponent:0.58];
+        [_collapsedButton setAccessibilityElement:NO];
+
+        _expandedButton = [NSButton buttonWithTitle:@"Delete" target:nil action:nil];
+        _expandedButton.bezelStyle = NSBezelStyleAccessoryBarAction;
+        _expandedButton.controlSize = NSControlSizeSmall;
+        _expandedButton.font = [NSFont systemFontOfSize:NSFont.smallSystemFontSize
+                                                 weight:NSFontWeightMedium];
+        _expandedButton.alignment = NSTextAlignmentCenter;
+        _expandedButton.hasDestructiveAction = YES;
+        _expandedButton.bezelColor = nil;
+        [_expandedButton setAccessibilityElement:NO];
+        _expandedButton.hidden = YES;
+
+        [self addSubview:_expandedButton];
+        [self addSubview:_collapsedButton];
+    }
+    return self;
+}
+
+- (NSView *)hitTest:(NSPoint)point {
+    return NSPointInRect(point, self.bounds) ? self : nil;
+}
+
+- (void)layout {
+    [super layout];
+    CGFloat width = NSWidth(self.bounds);
+    self.collapsedButton.frame = NSMakeRect(MAX(0.0, width - 20.0),
+                                            0.0,
+                                            MIN(20.0, width),
+                                            NSHeight(self.bounds));
+    if (!self.animating) {
+        self.expandedButton.frame = self.expanded
+            ? self.bounds
+            : NSOffsetRect(self.bounds, width, 0.0);
+    }
+}
 
 - (void)updateTrackingAreas {
     [super updateTrackingAreas];
@@ -69,37 +128,72 @@ static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
 
 - (void)mouseEntered:(NSEvent *)event {
     (void)event;
-    [self setExpanded:YES];
+    [self.hoverTimer invalidate];
+    __weak typeof(self) weakSelf = self;
+    self.hoverTimer = [NSTimer timerWithTimeInterval:LRDeleteHoverDelay
+                                            repeats:NO
+                                              block:^(NSTimer *timer) {
+        (void)timer;
+        LRHoverDeleteButton *button = weakSelf;
+        button.hoverTimer = nil;
+        [button setExpanded:YES];
+    }];
+    [NSRunLoop.mainRunLoop addTimer:self.hoverTimer forMode:NSRunLoopCommonModes];
 }
 
 - (void)mouseExited:(NSEvent *)event {
     (void)event;
+    [self.hoverTimer invalidate];
+    self.hoverTimer = nil;
     [self setExpanded:NO];
 }
 
 - (void)setExpanded:(BOOL)expanded {
-    self.title = @"";
-    self.attributedTitle = expanded
-        ? [[NSAttributedString alloc]
-              initWithString:@"Delete"
-                  attributes:@{
-                      NSFontAttributeName: [NSFont systemFontOfSize:11.0
-                                                               weight:NSFontWeightMedium],
-                      NSForegroundColorAttributeName: NSColor.systemRedColor,
-                  }]
-        : [[NSAttributedString alloc] initWithString:@""];
-    self.image = expanded
-        ? nil
-        : [NSImage imageWithSystemSymbolName:@"minus.circle"
-                    accessibilityDescription:@"Delete rule"];
-    self.imagePosition = expanded ? NSNoImage : NSImageOnly;
-    self.bezelStyle = NSBezelStyleAccessoryBarAction;
-    self.bordered = expanded;
-    self.bezelColor = nil;
-    self.contentTintColor = expanded
-        ? NSColor.systemRedColor
-        : [NSColor.whiteColor colorWithAlphaComponent:0.58];
-    self.widthConstraint.constant = expanded ? 52.0 : 20.0;
+    if (!expanded) {
+        [self.hoverTimer invalidate];
+        self.hoverTimer = nil;
+    }
+    BOOL shouldAnimate = self.configured && self.window != nil && self.expanded != expanded;
+    self.configured = YES;
+    _expanded = expanded;
+    [self layoutSubtreeIfNeeded];
+    if (!shouldAnimate) {
+        self.animating = NO;
+        self.collapsedButton.hidden = expanded;
+        self.collapsedButton.alphaValue = expanded ? 0.0 : 1.0;
+        self.expandedButton.hidden = !expanded;
+        self.expandedButton.alphaValue = expanded ? 1.0 : 0.0;
+        [self setNeedsLayout:YES];
+        [self layoutSubtreeIfNeeded];
+        return;
+    }
+
+    self.animating = YES;
+    self.collapsedButton.hidden = NO;
+    self.expandedButton.hidden = NO;
+    if (expanded) {
+        self.collapsedButton.alphaValue = 1.0;
+        self.expandedButton.alphaValue = 1.0;
+        self.expandedButton.frame = NSOffsetRect(self.bounds, NSWidth(self.bounds), 0.0);
+    } else {
+        self.collapsedButton.alphaValue = 0.0;
+        self.expandedButton.alphaValue = 1.0;
+        self.expandedButton.frame = self.bounds;
+    }
+    NSRect destination = expanded
+        ? self.bounds
+        : NSOffsetRect(self.bounds, NSWidth(self.bounds), 0.0);
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.18;
+        self.expandedButton.animator.frame = destination;
+        self.collapsedButton.animator.alphaValue = expanded ? 0.0 : 1.0;
+    } completionHandler:^{
+        if (self.expanded != expanded) { return; }
+        self.animating = NO;
+        self.collapsedButton.hidden = expanded;
+        self.expandedButton.hidden = !expanded;
+        [self setNeedsLayout:YES];
+    }];
 }
 
 @end
@@ -234,11 +328,11 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         [specialRoutesHeading.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor constant:12.0],
         [specialRoutesHeading.trailingAnchor constraintLessThanOrEqualToAnchor:sidebar.trailingAnchor
                                                                        constant:-12.0],
-        [specialRoutesHeading.bottomAnchor constraintEqualToAnchor:specialRoutes.topAnchor constant:6.0],
+        [specialRoutesHeading.bottomAnchor constraintEqualToAnchor:specialRoutes.topAnchor constant:8.0],
         [specialRoutes.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor],
         [specialRoutes.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor],
         [specialRoutes.bottomAnchor constraintEqualToAnchor:sidebar.safeAreaLayoutGuide.bottomAnchor
-                                                     constant:-6.0],
+                                                     constant:-18.0],
         [specialRoutes.heightAnchor constraintEqualToConstant:42.0],
     ]];
 
@@ -756,6 +850,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
             NSButton *addButton = LRSymbolButton(@"plus", @"Add rule", self,
                                                   @selector(addRule:));
             addButton.bordered = NO;
+            addButton.controlSize = NSControlSizeSmall;
             addButton.translatesAutoresizingMaskIntoConstraints = NO;
             cell.textField = label;
             [cell addSubview:label];
@@ -765,7 +860,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
                 [label.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
                 [addButton.leadingAnchor constraintGreaterThanOrEqualToAnchor:label.trailingAnchor
                                                                       constant:8.0],
-                [addButton.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-8.0],
+                [addButton.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-14.0],
                 [addButton.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
                 [addButton.widthAnchor constraintEqualToConstant:20.0],
                 [addButton.heightAnchor constraintEqualToConstant:20.0],
@@ -796,19 +891,19 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
             deleteButton.action = @selector(removeRuleFromSidebar:);
             [deleteButton setAccessibilityLabel:@"Delete rule"];
             deleteButton.translatesAutoresizingMaskIntoConstraints = NO;
-            deleteButton.widthConstraint = [deleteButton.widthAnchor constraintEqualToConstant:20.0];
-            deleteButton.widthConstraint.active = YES;
-            [deleteButton setExpanded:NO];
             ruleCell.deleteButton = deleteButton;
             [ruleCell addSubview:deleteButton];
             [NSLayoutConstraint activateConstraints:@[
                 [label.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4.0],
                 [label.trailingAnchor constraintEqualToAnchor:deleteButton.leadingAnchor constant:-6.0],
                 [label.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
-                [deleteButton.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-8.0],
+                [deleteButton.widthAnchor constraintEqualToConstant:50.0],
+                [deleteButton.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor
+                                                              constant:-14.0],
                 [deleteButton.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
                 [deleteButton.heightAnchor constraintEqualToConstant:20.0],
             ]];
+            [deleteButton setExpanded:NO];
         } else {
             [NSLayoutConstraint activateConstraints:@[
                 [label.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4.0],
