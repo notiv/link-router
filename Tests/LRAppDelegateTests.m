@@ -22,7 +22,10 @@
 - (void)moveRuleAtIndex:(NSUInteger)sourceIndex toChildIndex:(NSUInteger)childIndex;
 - (void)selectItem:(id)item;
 - (BOOL)outlineView:(NSOutlineView *)outlineView shouldShowOutlineCellForItem:(id)item;
-- (NSTableRowView *)outlineView:(NSOutlineView *)outlineView rowViewForItem:(id)item;
+@end
+
+@interface NSButton (LRHoverTesting)
+- (void)setExpanded:(BOOL)expanded;
 @end
 
 @interface LRRecordingLoginItemController : NSObject <LRLoginItemControlling>
@@ -186,29 +189,56 @@ static void TestSidebarUsesInlineRuleManagement(void) {
              "rule ordering should use drag and drop instead of a permanent down button");
     LRAssert(FindButtonWithAccessibilityLabel(editor.view, @"Remove selected rule") == nil,
              "rule removal should appear inline on hover instead of in a permanent toolbar");
-    LRAssert(FindButtonWithAccessibilityLabel(editor.view, @"Add rule") != nil,
+    NSTableCellView *groupCell = [rules viewAtColumn:0 row:0 makeIfNecessary:YES];
+    NSTableCellView *ruleCell = [rules viewAtColumn:0 row:1 makeIfNecessary:YES];
+    [groupCell layoutSubtreeIfNeeded];
+    [ruleCell layoutSubtreeIfNeeded];
+    NSButton *addButton = FindButtonWithAccessibilityLabel(groupCell, @"Add rule");
+    NSButton *deleteButton = FindButtonWithAccessibilityLabel(ruleCell, @"Delete rule");
+    LRAssert(addButton != nil,
              "the Rules heading should expose a compact inline add button");
-    NSTableRowView *deleteRow = [editor outlineView:rules rowViewForItem:rule];
-    deleteRow.frame = NSMakeRect(0.0, 0.0, 300.0, 24.0);
-    [deleteRow layoutSubtreeIfNeeded];
-    NSButton *deleteButton = FindButtonWithAccessibilityLabel(deleteRow, @"Delete rule");
     LRAssert(deleteButton != nil, "rule rows should own an inline Delete affordance");
     if (deleteButton != nil) {
-        deleteButton.hidden = NO;
-        [deleteRow layoutSubtreeIfNeeded];
-        NSPoint deleteCenter = NSMakePoint(NSMidX(deleteButton.frame), NSMidY(deleteButton.frame));
-        LRAssert([deleteRow hitTest:deleteCenter] == deleteButton,
-                 "the inline Delete affordance should receive clicks above the outline cell");
+        LRAssert(!deleteButton.hidden,
+                 "the selected rule should clearly expose its remove control");
+        NSPoint deleteCenter = [deleteButton convertPoint:
+            NSMakePoint(NSMidX(deleteButton.bounds), NSMidY(deleteButton.bounds))
+                                                  toView:ruleCell];
+        LRAssert([ruleCell hitTest:deleteCenter] == deleteButton,
+                 "the inline Delete affordance should receive clicks in the native cell");
         LRAssert(deleteButton.target == editor &&
                      deleteButton.action == NSSelectorFromString(@"removeRuleFromSidebar:"),
                  "the inline Delete affordance should be wired to rule removal");
+        [deleteButton setExpanded:YES];
+        LRAssert([deleteButton.attributedTitle.string isEqualToString:@"Delete"],
+                 "hovering the selected rule's minus should reveal Delete");
+        LRAssert(deleteButton.bordered &&
+                     deleteButton.bezelStyle == NSBezelStyleAccessoryBarAction,
+                 "Delete should be a compact native button rather than bare text");
+        [deleteButton setExpanded:NO];
+    }
+    if (addButton != nil && deleteButton != nil) {
+        NSPoint addCenter = [addButton convertPoint:
+            NSMakePoint(NSMidX(addButton.bounds), NSMidY(addButton.bounds))
+                                             toView:rules];
+        NSPoint deleteCenter = [deleteButton convertPoint:
+            NSMakePoint(NSMidX(deleteButton.bounds), NSMidY(deleteButton.bounds))
+                                                   toView:rules];
+        LRAssert(ABS(addCenter.x - deleteCenter.x) < 0.5,
+                 "the selected rule's minus should align exactly beneath the Rules plus");
     }
 
     LRAssert([rules.registeredDraggedTypes containsObject:@"com.linkrouter.rule-row"],
              "rule rows should register for native drag-and-drop reordering");
     NSOutlineView *otherRoutes = [editor valueForKey:@"specialRoutesOutlineView"];
+    NSTableCellView *localCell = [otherRoutes viewAtColumn:0 row:1 makeIfNecessary:YES];
+    [localCell layoutSubtreeIfNeeded];
     LRAssert(rules.indentationPerLevel == 0.0 && otherRoutes.indentationPerLevel == 0.0,
              "rule names and special routes should share one consistent text inset");
+    CGFloat ruleTextX = [ruleCell.textField convertPoint:NSZeroPoint toView:editor.view].x;
+    CGFloat localTextX = [localCell.textField convertPoint:NSZeroPoint toView:editor.view].x;
+    LRAssert(ABS(ruleTextX - localTextX) < 0.5,
+             "Local files should align with selected rule names");
     LRAssert(![editor outlineView:rules shouldShowOutlineCellForItem:@"Rules"],
              "the fixed Rules group should not show a disclosure arrow on hover");
 
@@ -216,6 +246,8 @@ static void TestSidebarUsesInlineRuleManagement(void) {
     CGFloat ruleTitleX = [detailStack convertPoint:NSZeroPoint toView:editor.view].x;
     [editor selectItem:@"Unmatched links"];
     [editor.view layoutSubtreeIfNeeded];
+    LRAssert(deleteButton == nil || deleteButton.hidden,
+             "rule removal should hide when its rule is no longer selected");
     CGFloat fallbackTitleX = [detailStack convertPoint:NSZeroPoint toView:editor.view].x;
     LRAssert(ABS(ruleTitleX - fallbackTitleX) < 0.5,
              "large detail titles should remain on one stable alignment guide");

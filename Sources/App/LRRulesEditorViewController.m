@@ -10,8 +10,6 @@ static NSUserInterfaceItemIdentifier const LRSidebarColumnIdentifier = @"Route";
 static NSUserInterfaceItemIdentifier const LRRuleCellIdentifier = @"RuleCell";
 static NSUserInterfaceItemIdentifier const LRSpecialRouteCellIdentifier = @"SpecialRouteCell";
 static NSUserInterfaceItemIdentifier const LRRulesGroupCellIdentifier = @"RulesGroupCell";
-static NSUserInterfaceItemIdentifier const LRRuleRowIdentifier = @"RuleRow";
-static NSUserInterfaceItemIdentifier const LRRulesGroupRowIdentifier = @"RulesGroupRow";
 static NSUserInterfaceItemIdentifier const LRNameFieldIdentifier = @"RuleName";
 static NSUserInterfaceItemIdentifier const LRProfileFieldIdentifier = @"Profile";
 static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
@@ -29,6 +27,15 @@ static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
 @end
 
 @implementation LRRulesOutlineView
+- (NSRect)frameOfCellAtColumn:(NSInteger)column row:(NSInteger)row {
+    NSRect frame = [super frameOfCellAtColumn:column row:row];
+    id item = row >= 0 && row < self.numberOfRows ? [self itemAtRow:row] : nil;
+    if (item != nil && ![item isEqual:LRRulesGroup]) {
+        frame.size.width = MAX(0.0, NSWidth(self.bounds) - NSMinX(frame) - 2.0);
+    }
+    return frame;
+}
+
 - (void)keyDown:(NSEvent *)event {
     BOOL isDelete = event.keyCode == 51 || event.keyCode == 117;
     if (isDelete && self.selectedRow >= 0 && self.deleteTarget != nil) {
@@ -84,56 +91,31 @@ static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
         : [[NSAttributedString alloc] initWithString:@""];
     self.image = expanded
         ? nil
-        : [NSImage imageWithSystemSymbolName:@"minus.circle.fill"
+        : [NSImage imageWithSystemSymbolName:@"minus.circle"
                     accessibilityDescription:@"Delete rule"];
     self.imagePosition = expanded ? NSNoImage : NSImageOnly;
-    self.bordered = NO;
+    self.bezelStyle = NSBezelStyleAccessoryBarAction;
+    self.bordered = expanded;
     self.bezelColor = nil;
-    self.contentTintColor = NSColor.secondaryLabelColor;
-    self.widthConstraint.constant = expanded ? 46.0 : 20.0;
+    self.contentTintColor = expanded
+        ? NSColor.systemRedColor
+        : [NSColor.whiteColor colorWithAlphaComponent:0.58];
+    self.widthConstraint.constant = expanded ? 52.0 : 20.0;
 }
 
 @end
 
-@interface LRRuleActionRowView : NSTableRowView
+@interface LRRuleSidebarCellView : NSTableCellView
 @property(nonatomic, strong) LRHoverDeleteButton *deleteButton;
-@property(nonatomic, strong) NSTrackingArea *hoverTrackingArea;
 @end
 
-@implementation LRRuleActionRowView
-
+@implementation LRRuleSidebarCellView
 - (NSView *)hitTest:(NSPoint)point {
-    if (!self.deleteButton.hidden) {
-        NSPoint buttonPoint = [self.deleteButton convertPoint:point fromView:self];
-        NSView *buttonHit = [self.deleteButton hitTest:buttonPoint];
-        if (buttonHit != nil) { return buttonHit; }
+    if (!self.deleteButton.hidden && NSPointInRect(point, self.deleteButton.frame)) {
+        return self.deleteButton;
     }
     return [super hitTest:point];
 }
-
-- (void)updateTrackingAreas {
-    [super updateTrackingAreas];
-    if (self.hoverTrackingArea != nil) { [self removeTrackingArea:self.hoverTrackingArea]; }
-    self.hoverTrackingArea = [[NSTrackingArea alloc]
-        initWithRect:NSZeroRect
-             options:NSTrackingMouseEnteredAndExited | NSTrackingActiveInKeyWindow |
-                     NSTrackingInVisibleRect
-               owner:self
-            userInfo:nil];
-    [self addTrackingArea:self.hoverTrackingArea];
-}
-
-- (void)mouseEntered:(NSEvent *)event {
-    (void)event;
-    self.deleteButton.hidden = NO;
-}
-
-- (void)mouseExited:(NSEvent *)event {
-    (void)event;
-    [self.deleteButton setExpanded:NO];
-    self.deleteButton.hidden = YES;
-}
-
 @end
 
 static NSTextField *LRLabel(NSString *text, NSFont *font, NSColor *color) {
@@ -192,6 +174,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 @property(nonatomic, strong) LRRoutingRule *draggedRule;
 - (void)renderDetail;
 - (void)selectItem:(id)item;
+- (void)updateRuleDeleteVisibility;
 @end
 
 @implementation LRRulesEditorViewController
@@ -367,7 +350,18 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         [outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
                  byExtendingSelection:NO];
     }
+    [self updateRuleDeleteVisibility];
     [self renderDetail];
+}
+
+- (void)updateRuleDeleteVisibility {
+    for (NSInteger row = 0; row < self.sidebarOutlineView.numberOfRows; row += 1) {
+        NSView *cell = [self.sidebarOutlineView viewAtColumn:0 row:row makeIfNecessary:NO];
+        if (![cell isKindOfClass:LRRuleSidebarCellView.class]) { continue; }
+        LRHoverDeleteButton *deleteButton = ((LRRuleSidebarCellView *)cell).deleteButton;
+        [deleteButton setExpanded:NO];
+        deleteButton.hidden = row != self.sidebarOutlineView.selectedRow;
+    }
 }
 
 - (void)markChanged {
@@ -784,11 +778,22 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
                 [NSFont systemFontOfSize:11.0 weight:NSFontWeightSemibold],
                 NSColor.secondaryLabelColor);
             label.translatesAutoresizingMaskIntoConstraints = NO;
+            NSButton *addButton = LRSymbolButton(@"plus", @"Add rule", self,
+                                                  @selector(addRule:));
+            addButton.bordered = NO;
+            addButton.translatesAutoresizingMaskIntoConstraints = NO;
             cell.textField = label;
             [cell addSubview:label];
+            [cell addSubview:addButton];
             [NSLayoutConstraint activateConstraints:@[
                 [label.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4.0],
                 [label.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+                [addButton.leadingAnchor constraintGreaterThanOrEqualToAnchor:label.trailingAnchor
+                                                                      constant:8.0],
+                [addButton.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-8.0],
+                [addButton.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+                [addButton.widthAnchor constraintEqualToConstant:20.0],
+                [addButton.heightAnchor constraintEqualToConstant:20.0],
             ]];
         }
         return cell;
@@ -799,70 +804,55 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         : LRSpecialRouteCellIdentifier;
     NSTableCellView *cell = [outlineView makeViewWithIdentifier:identifier owner:self];
     if (cell == nil) {
-        cell = [[NSTableCellView alloc] initWithFrame:NSZeroRect];
+        cell = isRule
+            ? [[LRRuleSidebarCellView alloc] initWithFrame:NSZeroRect]
+            : [[NSTableCellView alloc] initWithFrame:NSZeroRect];
         cell.identifier = identifier;
         NSTextField *label = [NSTextField labelWithString:@""];
         label.translatesAutoresizingMaskIntoConstraints = NO;
         label.lineBreakMode = NSLineBreakByTruncatingTail;
         cell.textField = label;
         [cell addSubview:label];
-        [NSLayoutConstraint activateConstraints:@[
-            [label.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4.0],
-            [label.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-4.0],
-            [label.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
-        ]];
+        if (isRule) {
+            LRRuleSidebarCellView *ruleCell = (LRRuleSidebarCellView *)cell;
+            LRHoverDeleteButton *deleteButton = [[LRHoverDeleteButton alloc]
+                initWithFrame:NSZeroRect];
+            deleteButton.target = self;
+            deleteButton.action = @selector(removeRuleFromSidebar:);
+            [deleteButton setAccessibilityLabel:@"Delete rule"];
+            deleteButton.translatesAutoresizingMaskIntoConstraints = NO;
+            deleteButton.widthConstraint = [deleteButton.widthAnchor constraintEqualToConstant:20.0];
+            deleteButton.widthConstraint.active = YES;
+            [deleteButton setExpanded:NO];
+            ruleCell.deleteButton = deleteButton;
+            [ruleCell addSubview:deleteButton];
+            [NSLayoutConstraint activateConstraints:@[
+                [label.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4.0],
+                [label.trailingAnchor constraintEqualToAnchor:deleteButton.leadingAnchor constant:-6.0],
+                [label.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+                [deleteButton.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-8.0],
+                [deleteButton.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+                [deleteButton.heightAnchor constraintEqualToConstant:20.0],
+            ]];
+        } else {
+            [NSLayoutConstraint activateConstraints:@[
+                [label.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor constant:4.0],
+                [label.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor constant:-4.0],
+                [label.centerYAnchor constraintEqualToAnchor:cell.centerYAnchor],
+            ]];
+        }
     }
     cell.objectValue = item;
+    if (isRule) {
+        LRRuleSidebarCellView *ruleCell = (LRRuleSidebarCellView *)cell;
+        NSInteger row = [outlineView rowForItem:item];
+        [ruleCell.deleteButton setExpanded:NO];
+        ruleCell.deleteButton.hidden = row != outlineView.selectedRow;
+    }
     NSString *title = isRule ? ((LRRoutingRule *)item).name : item;
     cell.textField.stringValue = title.length > 0 ? title : @"Untitled rule";
     cell.toolTip = cell.textField.stringValue;
     return cell;
-}
-
-- (NSTableRowView *)outlineView:(NSOutlineView *)outlineView rowViewForItem:(id)item {
-    if (outlineView != self.sidebarOutlineView) { return nil; }
-    BOOL isGroup = [item isEqual:LRRulesGroup];
-    NSUserInterfaceItemIdentifier identifier = isGroup
-        ? LRRulesGroupRowIdentifier
-        : LRRuleRowIdentifier;
-    NSTableRowView *rowView = [outlineView makeViewWithIdentifier:identifier owner:self];
-    if (rowView != nil) { return rowView; }
-
-    if (isGroup) {
-        rowView = [[NSTableRowView alloc] initWithFrame:NSZeroRect];
-        NSButton *addButton = LRSymbolButton(@"plus", @"Add rule", self, @selector(addRule:));
-        addButton.bordered = NO;
-        addButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [rowView addSubview:addButton];
-        [NSLayoutConstraint activateConstraints:@[
-            [addButton.trailingAnchor constraintEqualToAnchor:rowView.trailingAnchor constant:-16.0],
-            [addButton.centerYAnchor constraintEqualToAnchor:rowView.centerYAnchor],
-            [addButton.widthAnchor constraintEqualToConstant:20.0],
-            [addButton.heightAnchor constraintEqualToConstant:20.0],
-        ]];
-    } else {
-        LRRuleActionRowView *ruleRow = [[LRRuleActionRowView alloc] initWithFrame:NSZeroRect];
-        LRHoverDeleteButton *deleteButton = [[LRHoverDeleteButton alloc] initWithFrame:NSZeroRect];
-        deleteButton.target = self;
-        deleteButton.action = @selector(removeRuleFromSidebar:);
-        deleteButton.bezelStyle = NSBezelStyleRounded;
-        [deleteButton setAccessibilityLabel:@"Delete rule"];
-        deleteButton.translatesAutoresizingMaskIntoConstraints = NO;
-        deleteButton.widthConstraint = [deleteButton.widthAnchor constraintEqualToConstant:20.0];
-        deleteButton.widthConstraint.active = YES;
-        [deleteButton setExpanded:NO];
-        deleteButton.hidden = YES;
-        ruleRow.deleteButton = deleteButton;
-        [ruleRow addSubview:deleteButton];
-        [NSLayoutConstraint activateConstraints:@[
-            [deleteButton.trailingAnchor constraintEqualToAnchor:ruleRow.trailingAnchor constant:-16.0],
-            [deleteButton.centerYAnchor constraintEqualToAnchor:ruleRow.centerYAnchor],
-            [deleteButton.heightAnchor constraintEqualToConstant:20.0],
-        ]];
-        rowView = ruleRow;
-    }
-    rowView.identifier = identifier;
-    return rowView;
 }
 
 - (BOOL)outlineView:(NSOutlineView *)outlineView shouldShowOutlineCellForItem:(id)item {
@@ -937,6 +927,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
             : self.sidebarOutlineView;
         [otherOutlineView deselectAll:nil];
     }
+    [self updateRuleDeleteVisibility];
     [self renderDetail];
 }
 
