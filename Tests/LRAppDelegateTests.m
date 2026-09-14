@@ -35,6 +35,8 @@ static void TestSettingsHTMLContainsTheReferenceComposition(void) {
              "the title bar should use reference-aligned window controls");
     LRAssert([HTML containsString:@"--control-height: 32px"],
              "editor controls should share a readable 32-pixel height");
+    LRAssert([HTML containsString:@"overflow: auto; padding: 12px 8px 4px;"],
+             "the first sidebar rule should sit twelve pixels below the title bar");
     LRAssert([HTML containsString:@".text-input:focus-visible { outline: 0; }"],
              "text fields should rely on the shell focus ring instead of drawing a second outline");
 }
