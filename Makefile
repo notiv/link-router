@@ -12,7 +12,7 @@ COMMON_FLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(BUILD_DIR)/ModuleCac
 CORE_SOURCES := $(wildcard Sources/Core/*.m)
 APP_SOURCES := $(wildcard Sources/App/*.m)
 APP_LIBRARY_SOURCES := $(filter-out Sources/App/main.m,$(APP_SOURCES))
-APP_FRAMEWORKS := -framework Cocoa -framework UniformTypeIdentifiers -framework ServiceManagement
+APP_FRAMEWORKS := -framework Cocoa -framework ServiceManagement
 TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests $(BUILD_DIR)/LRIntegrationTests $(BUILD_DIR)/LRLaunchLifecycleTests $(BUILD_DIR)/LRAppDelegateTests $(BUILD_DIR)/LRIconFactoryTests
 
 .PHONY: all build test test-config test-router test-launch-plan test-store test-integration test-launch-lifecycle test-app-delegate test-icon icon app installer verify verify-bundle verify-installer run clean
@@ -78,10 +78,9 @@ installer: app
 
 verify-bundle: app
 	test "$$(plutil -extract LSUIElement raw $(APP_BUNDLE)/Contents/Info.plist)" = "true"
-	test "$$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw $(APP_BUNDLE)/Contents/Info.plist)" = "http"
-	test "$$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.1 raw $(APP_BUNDLE)/Contents/Info.plist)" = "https"
-	test "$$(plutil -extract CFBundleURLTypes.1.CFBundleURLSchemes.0 raw $(APP_BUNDLE)/Contents/Info.plist)" = "file"
-	test "$$(plutil -extract CFBundleDocumentTypes.0.LSItemContentTypes.0 raw $(APP_BUNDLE)/Contents/Info.plist)" = "public.html"
+	test "$$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes json -o - $(APP_BUNDLE)/Contents/Info.plist)" = '["http","https"]'
+	! plutil -extract CFBundleURLTypes.1 raw $(APP_BUNDLE)/Contents/Info.plist >/dev/null 2>&1
+	! plutil -extract CFBundleDocumentTypes raw $(APP_BUNDLE)/Contents/Info.plist >/dev/null 2>&1
 	test "$$(plutil -extract CFBundleIconFile raw $(APP_BUNDLE)/Contents/Info.plist)" = "AppIcon.icns"
 	test -f $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	test ! -e $(APP_BUNDLE)/Contents/Resources/Settings.html

@@ -31,23 +31,35 @@ static void TestSafariAndChromePlans(void) {
              "Chrome arguments should remain separate and preserve the URL");
 }
 
-static void TestPrivateChromePlanSupportsProfilesAndFiles(void) {
+static void TestPrivateChromePlanSupportsProfiles(void) {
     NSError *error = nil;
-    NSURL *URL = [NSURL fileURLWithPath:@"/tmp/Local Page.html"];
+    NSURL *URL = [NSURL URLWithString:@"https://example.com/private-profile"];
     LRBrowserTarget *target =
         [LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome
                                        profile:@"Profile 2"
                                privateBrowsing:YES];
     LRLaunchPlan *plan = [LRLaunchPlan planForURL:URL target:target error:&error];
 
-    LRAssert(plan != nil && error == nil, "private Chrome should accept a local file URL");
+    LRAssert(plan != nil && error == nil, "private Chrome should accept a web URL");
     LRAssert(plan.mode == LRLaunchModeExecutable,
              "private Chrome should launch its executable even with a selected profile");
     NSArray<NSString *> *expectedArguments = @[
-        @"--profile-directory=Profile 2", @"--incognito", @"file:///tmp/Local%20Page.html"
+        @"--profile-directory=Profile 2", @"--incognito", URL.absoluteString
     ];
     LRAssert([plan.arguments isEqualToArray:expectedArguments],
-             "Chrome should receive profile and incognito switches before the file URL");
+             "Chrome should receive profile and incognito switches before the URL");
+}
+
+static void TestLaunchPlanRejectsLocalFiles(void) {
+    NSError *error = nil;
+    LRLaunchPlan *plan = [LRLaunchPlan
+        planForURL:[NSURL fileURLWithPath:@"/tmp/Local Page.html"]
+            target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]
+             error:&error];
+
+    LRAssert(plan == nil, "a launch plan should reject local file URLs");
+    LRAssert(error.code == LRRoutingErrorUnsupportedScheme,
+             "a local file launch should report an unsupported scheme");
 }
 
 static void TestPrivateChromePlanDoesNotRequireAProfile(void) {
@@ -68,7 +80,8 @@ static void TestPrivateChromePlanDoesNotRequireAProfile(void) {
 int main(void) {
     @autoreleasepool {
         TestSafariAndChromePlans();
-        TestPrivateChromePlanSupportsProfilesAndFiles();
+        TestPrivateChromePlanSupportsProfiles();
+        TestLaunchPlanRejectsLocalFiles();
         TestPrivateChromePlanDoesNotRequireAProfile();
         return LRFinishTests();
     }

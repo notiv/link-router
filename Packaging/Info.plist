@@ -4,21 +4,6 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
-    <key>CFBundleDocumentTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleTypeName</key>
-            <string>HTML document</string>
-            <key>CFBundleTypeRole</key>
-            <string>Viewer</string>
-            <key>LSHandlerRank</key>
-            <string>Alternate</string>
-            <key>LSItemContentTypes</key>
-            <array>
-                <string>public.html</string>
-            </array>
-        </dict>
-    </array>
     <key>CFBundleDisplayName</key>
     <string>LinkRouter</string>
     <key>CFBundleExecutable</key>
@@ -48,16 +33,6 @@
             <array>
                 <string>http</string>
                 <string>https</string>
-            </array>
-        </dict>
-        <dict>
-            <key>CFBundleTypeRole</key>
-            <string>Viewer</string>
-            <key>CFBundleURLName</key>
-            <string>Local File URL</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>file</string>
             </array>
         </dict>
     </array>

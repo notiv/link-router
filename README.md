@@ -1,6 +1,6 @@
 # LinkRouter
 
-LinkRouter is a small macOS menu-bar app that sends web links and local HTML files to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included graphical settings editor writes that file for you.
+LinkRouter is a small macOS menu-bar app that sends web links to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included graphical settings editor writes that file for you.
 
 It follows the shape of the utility shown in [Thorsten Ball's LinkRouter post](https://x.com/thorstenball/status/2098327328845656224): first-match host rules, an explicit fallback, and Chrome profile routing.
 
@@ -52,15 +52,15 @@ To have LinkRouter available automatically, open its menu and enable **Start at 
 
 An exact pattern such as `console.cloud.google.com` matches only that host. A leading wildcard such as `*.example.com` matches both `example.com` and any subdomain such as `docs.example.com`. Matching is case-insensitive. This first version intentionally matches hosts, not URL paths or query parameters.
 
-Local `file://` URLs and HTML documents have no web hostname, so they always use the configured fallback browser, profile, and private-window setting.
-
 For Chrome, enter the profile directory—not necessarily the visible profile name. Open `chrome://version` in that profile and use the final component of **Profile Path**, typically `Default`, `Profile 1`, or `Profile 2`. Leave the field empty to let Chrome choose normally.
 
 Private windows are supported for Google Chrome through its Incognito launch mode and can be combined with a profile. Safari targets intentionally disable this option because Safari has no supported API for opening a URL in a guaranteed private window.
 
 ## Make LinkRouter the default browser
 
-Launch the packaged app, open its menu, and choose **Set as Default Browser…**. LinkRouter asks macOS to associate `http`, `https`, `file`, and HTML documents; macOS may show consent prompts. The app never changes defaults automatically.
+Launch the packaged app, open its menu, and choose **Set as Default Browser…**. LinkRouter asks macOS to associate `http` and `https`; macOS may show consent prompts. The app never changes defaults automatically.
+
+Version 0.2.0 no longer registers for `file://` URLs or HTML documents. When upgrading from 0.1.x, replace the older copy in `/Applications` before testing local HTML workflows. If macOS still opens HTML files with LinkRouter afterward, select an HTML file in Finder, choose **Get Info**, select the intended browser under **Open with**, and choose **Change All**.
 
 The app must stay running to route links. It has no Dock icon; quit it from **Quit LinkRouter** in the menu.
 
@@ -95,7 +95,7 @@ Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profi
 
 - All routing and configuration stay on the Mac.
 - The settings UI is built entirely with native AppKit controls; LinkRouter has no embedded web content, telemetry, analytics, or browsing-history log.
-- Only `http`, `https`, and local `file` URLs are accepted.
+- Only `http` and `https` URLs are accepted.
 - Browser names, host patterns, and Chrome profile directories are validated.
 - Chrome is launched with a fixed executable and a typed argument array; config values never pass through a shell.
 - Config saves are atomic and use user-only file permissions.
@@ -121,9 +121,7 @@ The implementation follows Apple's documented APIs and bundle keys:
 - [`NSApplicationDelegate.application(_:open:)`](https://developer.apple.com/documentation/appkit/nsapplicationdelegate/application(_:open:)) delivers declared URL types to the app.
 - [`NSWorkspace.open(_:withApplicationAt:configuration:completionHandler:)`](https://developer.apple.com/documentation/appkit/nsworkspace/open(_:withapplicationat:configuration:completionhandler:)) opens a URL in an explicitly selected app.
 - [`NSWorkspace.setDefaultApplication(at:toOpenURLsWithScheme:completion:)`](https://developer.apple.com/documentation/appkit/nsworkspace/setdefaultapplication(at:toopenurlswithscheme:completion:)) requests the default handler and allows macOS to obtain consent.
-- [`NSWorkspace.setDefaultApplication(at:toOpen:completion:)`](https://developer.apple.com/documentation/appkit/nsworkspace/setdefaultapplication%28at%3Atoopen%3Acompletion%3A%29) requests the default handler for HTML documents.
-- [`CFBundleURLTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleurltypes) declares `http`, `https`, and `file` support.
-- [`CFBundleDocumentTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundledocumenttypes) declares HTML document support.
+- [`CFBundleURLTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleurltypes) declares `http` and `https` support.
 - [`CFBundleIconFile`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleiconfile) identifies the icon in the app bundle's resources.
 - [`LSUIElement`](https://developer.apple.com/documentation/bundleresources/information-property-list/lsuielement) keeps this agent app out of the Dock.
 - [`SMAppService.mainAppService`](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp?language=objc) registers the main app to launch at login and exposes its current approval state.

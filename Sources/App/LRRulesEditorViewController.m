@@ -4,7 +4,6 @@
 
 static NSString *const LRRulesGroup = @"Rules";
 static NSString *const LRFallbackItem = @"Unmatched links";
-static NSString *const LRLocalFilesItem = @"Local files";
 static NSPasteboardType const LRRulePasteboardType = @"com.linkrouter.rule-row";
 static NSUserInterfaceItemIdentifier const LRSidebarColumnIdentifier = @"Route";
 static NSUserInterfaceItemIdentifier const LRRuleCellIdentifier = @"RuleCell";
@@ -235,12 +234,12 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         [specialRoutesHeading.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor constant:12.0],
         [specialRoutesHeading.trailingAnchor constraintLessThanOrEqualToAnchor:sidebar.trailingAnchor
                                                                        constant:-12.0],
-        [specialRoutesHeading.bottomAnchor constraintEqualToAnchor:specialRoutes.topAnchor constant:-4.0],
+        [specialRoutesHeading.bottomAnchor constraintEqualToAnchor:specialRoutes.topAnchor constant:6.0],
         [specialRoutes.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor],
         [specialRoutes.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor],
         [specialRoutes.bottomAnchor constraintEqualToAnchor:sidebar.safeAreaLayoutGuide.bottomAnchor
                                                      constant:-6.0],
-        [specialRoutes.heightAnchor constraintEqualToConstant:84.0],
+        [specialRoutes.heightAnchor constraintEqualToConstant:42.0],
     ]];
 
     NSViewController *sidebarController = [[NSViewController alloc] init];
@@ -526,28 +525,9 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     id item = [self selectedItem];
     if ([item isKindOfClass:LRRoutingRule.class]) {
         [self renderRule:item];
-    } else if ([item isEqual:LRLocalFilesItem]) {
-        [self addHeading:@"Local files"
-                  detail:@"Local HTML files have no hostname, so they follow the unmatched-link target."];
-        NSString *summary = self.defaultTarget.application == LRBrowserApplicationSafari
-            ? @"Safari"
-            : [NSString stringWithFormat:@"Google Chrome%@%@",
-                  self.defaultTarget.profile.length > 0
-                      ? [@" · " stringByAppendingString:self.defaultTarget.profile]
-                      : @"",
-                  self.defaultTarget.privateBrowsing ? @" · private" : @""];
-        [self addSectionTitle:@"Open in"];
-        [self.detailStack addArrangedSubview:LRLabel(summary,
-                                                     [NSFont systemFontOfSize:NSFont.systemFontSize
-                                                                      weight:NSFontWeightMedium],
-                                                     NSColor.labelColor)];
-        NSButton *editFallback = [NSButton buttonWithTitle:@"Edit Unmatched Links"
-                                                     target:self
-                                                     action:@selector(editFallback:)];
-        [self.detailStack addArrangedSubview:editFallback];
     } else {
         [self addHeading:@"Unmatched links"
-                  detail:@"Links that don't match a rule, along with local HTML files, open here."];
+                  detail:@"Links that don't match a rule open here."];
         [self addBrowserControlsForTarget:self.defaultTarget inlineTitle:YES];
     }
 }
@@ -693,11 +673,6 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     [self markChanged];
 }
 
-- (void)editFallback:(id)sender {
-    (void)sender;
-    [self selectItem:LRFallbackItem];
-}
-
 - (void)controlTextDidChange:(NSNotification *)notification {
     NSTextField *field = notification.object;
     LRRoutingRule *rule = [self selectedRule];
@@ -731,7 +706,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 }
 
 - (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item {
-    if (item == nil) { return outlineView == self.sidebarOutlineView ? 1 : 2; }
+    if (item == nil) { return 1; }
     if (outlineView == self.sidebarOutlineView && [item isEqual:LRRulesGroup]) {
         return (NSInteger)self.rules.count;
     }
@@ -742,12 +717,12 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     if (item == nil) {
         return outlineView == self.sidebarOutlineView
             ? LRRulesGroup
-            : (index == 0 ? LRFallbackItem : LRLocalFilesItem);
+            : LRFallbackItem;
     }
     if (outlineView == self.sidebarOutlineView && [item isEqual:LRRulesGroup]) {
         return self.rules[(NSUInteger)index];
     }
-    return index == 0 ? LRFallbackItem : LRLocalFilesItem;
+    return nil;
 }
 
 - (BOOL)outlineView:(NSOutlineView *)outlineView isItemExpandable:(id)item {

@@ -42,22 +42,18 @@ icon="$app/Contents/Resources/AppIcon.icns"
     print -u2 "The app bundle is not configured as a menu-bar agent"
     exit 1
 }
-[[ "$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw "$info")" == "http" ]] || {
-    print -u2 "The app bundle does not declare the http URL scheme"
+[[ "$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes json -o - "$info")" == '["http","https"]' ]] || {
+    print -u2 "The app bundle must declare exactly the http and https URL schemes"
     exit 1
 }
-[[ "$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.1 raw "$info")" == "https" ]] || {
-    print -u2 "The app bundle does not declare the https URL scheme"
+if plutil -extract CFBundleURLTypes.1 raw "$info" >/dev/null 2>&1; then
+    print -u2 "The app bundle unexpectedly declares an extra URL scheme"
     exit 1
-}
-[[ "$(plutil -extract CFBundleURLTypes.1.CFBundleURLSchemes.0 raw "$info")" == "file" ]] || {
-    print -u2 "The app bundle does not declare the file URL scheme"
+fi
+if plutil -extract CFBundleDocumentTypes raw "$info" >/dev/null 2>&1; then
+    print -u2 "The app bundle unexpectedly declares document handling"
     exit 1
-}
-[[ "$(plutil -extract CFBundleDocumentTypes.0.LSItemContentTypes.0 raw "$info")" == "public.html" ]] || {
-    print -u2 "The app bundle does not declare HTML document support"
-    exit 1
-}
+fi
 [[ -f "$icon" ]] || { print -u2 "AppIcon.icns is missing from the app bundle"; exit 1; }
 codesign --verify --deep --strict "$app"
 

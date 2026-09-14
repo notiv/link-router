@@ -41,7 +41,7 @@
     self.editorRequested = YES;
 }
 
-static void TestFileOpenEventRoutesToFallback(void) {
+static void TestFileOpenEventIsRejected(void) {
     LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
     LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
     [delegate setValue:launcher forKey:@"browserLauncher"];
@@ -49,10 +49,8 @@ static void TestFileOpenEventRoutesToFallback(void) {
 
     [delegate application:nil openURLs:@[fileURL]];
 
-    LRAssert([launcher.openedURL isEqual:fileURL],
-             "a macOS file-open event should reach the browser launcher");
-    LRAssert(launcher.target.application == LRBrowserApplicationSafari,
-             "a file-open event should use the configured fallback target");
+    LRAssert(launcher.openedURL == nil,
+             "a macOS file-open event should not reach the browser launcher");
 }
 @end
 
@@ -112,7 +110,7 @@ int main(void) {
     @autoreleasepool {
         TestExplicitApplicationOpenShowsEditor();
         TestLoginLaunchDoesNotOpenEditor();
-        TestFileOpenEventRoutesToFallback();
+        TestFileOpenEventIsRejected();
         return LRFinishTests();
     }
 }

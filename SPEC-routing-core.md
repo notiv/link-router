@@ -2,7 +2,7 @@
 
 ## Objective
 
-Provide a small, dependency-free Objective-C library that turns an HTTP, HTTPS, or local file URL and a human-readable JSON config into a browser target. Host rules are evaluated from top to bottom, and the first matching rule wins; file URLs use the fallback target.
+Provide a small, dependency-free Objective-C library that turns an HTTP or HTTPS URL and a human-readable JSON config into a browser target. Host rules are evaluated from top to bottom, and the first matching rule wins.
 
 The JSON format is:
 
@@ -21,7 +21,7 @@ The JSON format is:
 }
 ```
 
-An exact host matches only itself. A leading `*.` matches both the base domain and its subdomains. Matching is case-insensitive. `http`, `https`, and local `file` URLs are routable; file URLs have no host match and use the fallback.
+An exact host matches only itself. A leading `*.` matches both the base domain and its subdomains. Matching is case-insensitive. Only `http` and `https` URLs are routable.
 
 ## Tech Stack
 

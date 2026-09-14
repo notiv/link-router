@@ -1,7 +1,5 @@
 #import "LRAppDelegate.h"
 
-#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
-
 #import "LRBrowserLauncher.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
@@ -246,9 +244,9 @@
         [self setStatus:@"Launch the packaged LinkRouter.app before setting the default."];
         return;
     }
-    [self setStatus:@"Requesting default-browser and HTML-file access…"];
+    [self setStatus:@"Requesting default-browser access…"];
     [self requestDefaultApplicationAtURL:applicationURL
-                           forURLSchemes:@[@"http", @"https", @"file"]
+                           forURLSchemes:@[@"http", @"https"]
                                    index:0
                               completion:^(NSError *schemeError) {
         if (schemeError != nil) {
@@ -256,18 +254,7 @@
                                 stringByAppendingString:schemeError.localizedDescription]];
             return;
         }
-        [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
-                                              toOpenContentType:UTTypeHTML
-                                               completionHandler:^(NSError *HTMLError) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (HTMLError != nil) {
-                    [self setStatus:[@"HTML-file association error: "
-                                        stringByAppendingString:HTMLError.localizedDescription]];
-                } else {
-                    [self setStatus:@"LinkRouter handles web links, file URLs, and HTML documents."];
-                }
-            });
-        }];
+        [self setStatus:@"LinkRouter handles web links."];
     }];
 }
 

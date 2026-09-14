@@ -47,14 +47,13 @@ static void TestExactWildcardPrecedenceAndFallback(void) {
              "unmatched URL should use fallback");
 }
 
-static void TestFileURLsUseFallback(void) {
+static void TestRejectsFileURLs(void) {
     NSError *error = nil;
     LRRouteResult *result = [TestRouter() routeForURL:[NSURL fileURLWithPath:@"/tmp/page.html"]
                                                 error:&error];
-    LRAssert(result != nil && error == nil, "a local file URL should be accepted");
-    LRAssert(result.ruleName == nil, "a file URL should not match host rules");
-    LRAssert(result.target.application == LRBrowserApplicationSafari,
-             "a file URL should use the configured fallback");
+    LRAssert(result == nil, "a local file URL should be rejected");
+    LRAssert(error.code == LRRoutingErrorUnsupportedScheme,
+             "a local file URL should report an unsupported scheme");
 }
 
 static void TestRejectsUnsupportedSchemes(void) {
@@ -66,21 +65,11 @@ static void TestRejectsUnsupportedSchemes(void) {
              "an unsupported URL should report its scheme");
 }
 
-static void TestRejectsRemoteFileURLs(void) {
-    NSError *error = nil;
-    LRRouteResult *result = [TestRouter() routeForURL:
-        [NSURL URLWithString:@"file://files.example.com/page.html"] error:&error];
-    LRAssert(result == nil, "a remote file URL should be rejected");
-    LRAssert(error.code == LRRoutingErrorRemoteFileURL,
-             "a remote file URL should report that only local files are supported");
-}
-
 int main(void) {
     @autoreleasepool {
         TestExactWildcardPrecedenceAndFallback();
-        TestFileURLsUseFallback();
+        TestRejectsFileURLs();
         TestRejectsUnsupportedSchemes();
-        TestRejectsRemoteFileURLs();
         return LRFinishTests();
     }
 }

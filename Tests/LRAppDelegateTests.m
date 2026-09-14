@@ -231,14 +231,21 @@ static void TestSidebarUsesInlineRuleManagement(void) {
     LRAssert([rules.registeredDraggedTypes containsObject:@"com.linkrouter.rule-row"],
              "rule rows should register for native drag-and-drop reordering");
     NSOutlineView *otherRoutes = [editor valueForKey:@"specialRoutesOutlineView"];
-    NSTableCellView *localCell = [otherRoutes viewAtColumn:0 row:1 makeIfNecessary:YES];
-    [localCell layoutSubtreeIfNeeded];
+    LRAssert(otherRoutes.numberOfRows == 1,
+             "the sidebar should expose only Unmatched links below the rules");
+    NSTableCellView *fallbackCell = [otherRoutes viewAtColumn:0 row:0 makeIfNecessary:YES];
+    NSTextField *otherRoutesHeading = FindLabelWithText(editor.view, @"Everything Else");
+    [fallbackCell layoutSubtreeIfNeeded];
+    NSRect headingFrame = [otherRoutesHeading convertRect:otherRoutesHeading.bounds
+                                                  toView:editor.view];
+    NSRect fallbackFrame = [fallbackCell.textField convertRect:fallbackCell.textField.bounds
+                                                        toView:editor.view];
+    CGFloat fallbackGap = ABS(NSMidY(headingFrame) - NSMidY(fallbackFrame)) -
+                          (NSHeight(headingFrame) + NSHeight(fallbackFrame)) / 2.0;
+    LRAssert(fallbackGap <= 3.0,
+             "Unmatched links should sit directly beneath Everything Else");
     LRAssert(rules.indentationPerLevel == 0.0 && otherRoutes.indentationPerLevel == 0.0,
              "rule names and special routes should share one consistent text inset");
-    CGFloat ruleTextX = [ruleCell.textField convertPoint:NSZeroPoint toView:editor.view].x;
-    CGFloat localTextX = [localCell.textField convertPoint:NSZeroPoint toView:editor.view].x;
-    LRAssert(ABS(ruleTextX - localTextX) < 0.5,
-             "Local files should align with selected rule names");
     LRAssert(![editor outlineView:rules shouldShowOutlineCellForItem:@"Rules"],
              "the fixed Rules group should not show a disclosure arrow on hover");
 
