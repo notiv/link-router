@@ -33,15 +33,20 @@
     }
 
     plan.bundleIdentifier = @"com.google.Chrome";
-    if (target.profile.length == 0) {
+    if (target.profile.length == 0 && !target.privateBrowsing) {
         plan.mode = LRLaunchModeWorkspace;
         plan.arguments = @[];
     } else {
         plan.mode = LRLaunchModeExecutable;
-        plan.arguments = @[
-            [@"--profile-directory=" stringByAppendingString:target.profile],
-            URL.absoluteString,
-        ];
+        NSMutableArray<NSString *> *arguments = [NSMutableArray array];
+        if (target.profile.length > 0) {
+            [arguments addObject:[@"--profile-directory=" stringByAppendingString:target.profile]];
+        }
+        if (target.privateBrowsing) {
+            [arguments addObject:@"--incognito"];
+        }
+        [arguments addObject:URL.absoluteString];
+        plan.arguments = arguments;
     }
     return plan;
 }

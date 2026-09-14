@@ -9,6 +9,7 @@
 @property(nonatomic, copy) LRConfigurationSavedHandler configurationSaved;
 @property(nonatomic, strong) NSPopUpButton *defaultBrowserPicker;
 @property(nonatomic, strong) NSTextField *defaultProfileField;
+@property(nonatomic, strong) NSButton *defaultPrivateButton;
 @property(nonatomic, strong) LRRuleTableController *ruleTableController;
 @property(nonatomic, strong) NSTextField *statusLabel;
 @end
@@ -18,13 +19,13 @@
 - (instancetype)initWithConfigStore:(LRConfigStore *)configStore
                configurationSaved:(LRConfigurationSavedHandler)configurationSaved {
     NSWindow *window = [[NSWindow alloc]
-        initWithContentRect:NSMakeRect(0, 0, 760, 510)
+        initWithContentRect:NSMakeRect(0, 0, 840, 510)
                   styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                             NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
                     backing:NSBackingStoreBuffered
                       defer:NO];
     window.title = @"LinkRouter Rules";
-    window.minSize = NSMakeSize(680, 430);
+    window.minSize = NSMakeSize(760, 430);
     window.releasedWhenClosed = NO;
     self = [super initWithWindow:window];
     if (self) {
@@ -45,7 +46,7 @@
     NSTextField *title = [NSTextField labelWithString:@"Link routing"];
     title.font = [NSFont preferredFontForTextStyle:NSFontTextStyleTitle1 options:@{}];
     NSTextField *subtitle = [NSTextField wrappingLabelWithString:
-        @"Choose a fallback, then add rules for the sites that belong in a specific browser or Chrome profile."];
+        @"Choose a fallback, then add rules for sites that belong in a specific browser, Chrome profile, or private window."];
     subtitle.textColor = NSColor.secondaryLabelColor;
 
     NSTextField *defaultLabel = [NSTextField labelWithString:@"Fallback browser"];
@@ -60,8 +61,13 @@
     self.defaultProfileField.placeholderString = @"Chrome profile: Default or Profile 1";
     [self.defaultProfileField setAccessibilityLabel:@"Fallback Chrome profile"];
     [self.defaultProfileField.widthAnchor constraintGreaterThanOrEqualToConstant:230].active = YES;
+    self.defaultPrivateButton = [NSButton checkboxWithTitle:@"Private window"
+                                                    target:nil
+                                                    action:nil];
+    [self.defaultPrivateButton setAccessibilityLabel:@"Open fallback in a private Chrome window"];
     NSStackView *fallback = [NSStackView stackViewWithViews:@[
-        defaultLabel, self.defaultBrowserPicker, defaultProfileLabel, self.defaultProfileField
+        defaultLabel, self.defaultBrowserPicker, defaultProfileLabel, self.defaultProfileField,
+        self.defaultPrivateButton
     ]];
     fallback.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     fallback.alignment = NSLayoutAttributeCenterY;
@@ -127,6 +133,9 @@
     }
     [self.defaultBrowserPicker selectItemAtIndex:(NSInteger)configuration.defaultTarget.application];
     self.defaultProfileField.stringValue = configuration.defaultTarget.profile ?: @"";
+    self.defaultPrivateButton.state = configuration.defaultTarget.privateBrowsing
+                                          ? NSControlStateValueOn
+                                          : NSControlStateValueOff;
     [self.ruleTableController setRoutingRules:configuration.rules];
     [self updateDefaultProfileAvailability];
     [self showStatus:[NSString stringWithFormat:@"Loaded %lu rule%@.",
@@ -141,7 +150,9 @@
     LRBrowserTarget *fallback = [LRBrowserTarget targetWithApplication:application
                                                                profile:application == LRBrowserApplicationChrome
                                                                            ? self.defaultProfileField.stringValue
-                                                                           : nil];
+                                                                           : nil
+                                                       privateBrowsing:application == LRBrowserApplicationChrome &&
+                                                                           self.defaultPrivateButton.state == NSControlStateValueOn];
     LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
         initWithDefaultTarget:fallback
                          rules:self.ruleTableController.routingRules];
@@ -150,7 +161,7 @@
         [self showError:error.localizedDescription];
         return;
     }
-    [self showStatus:@"Saved. New links use these rules immediately."];
+    [self showStatus:@"Saved. New URLs use these rules immediately."];
     self.configurationSaved(configuration);
 }
 
@@ -167,8 +178,12 @@
 }
 
 - (void)updateDefaultProfileAvailability {
-    self.defaultProfileField.enabled =
-        self.defaultBrowserPicker.indexOfSelectedItem == LRBrowserApplicationChrome;
+    BOOL isChrome = self.defaultBrowserPicker.indexOfSelectedItem == LRBrowserApplicationChrome;
+    self.defaultProfileField.enabled = isChrome;
+    self.defaultPrivateButton.enabled = isChrome;
+    if (!isChrome) {
+        self.defaultPrivateButton.state = NSControlStateValueOff;
+    }
 }
 
 - (void)updateStatusLabel:(NSString *)message color:(NSColor *)color {

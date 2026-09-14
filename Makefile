@@ -12,6 +12,7 @@ COMMON_FLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(BUILD_DIR)/ModuleCac
 CORE_SOURCES := $(wildcard Sources/Core/*.m)
 APP_SOURCES := $(wildcard Sources/App/*.m)
 APP_LIBRARY_SOURCES := $(filter-out Sources/App/main.m,$(APP_SOURCES))
+APP_FRAMEWORKS := -framework Cocoa -framework UniformTypeIdentifiers
 TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests $(BUILD_DIR)/LRRuleDraftTests $(BUILD_DIR)/LRIntegrationTests $(BUILD_DIR)/LRLaunchLifecycleTests $(BUILD_DIR)/LRAppDelegateTests $(BUILD_DIR)/LRIconFactoryTests
 
 .PHONY: all build test test-config test-router test-launch-plan test-store test-rule-draft test-integration test-launch-lifecycle test-app-delegate test-icon icon app installer verify verify-bundle verify-installer run clean
@@ -82,6 +83,8 @@ verify-bundle: app
 	test "$$(plutil -extract LSUIElement raw $(APP_BUNDLE)/Contents/Info.plist)" = "true"
 	test "$$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.0 raw $(APP_BUNDLE)/Contents/Info.plist)" = "http"
 	test "$$(plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes.1 raw $(APP_BUNDLE)/Contents/Info.plist)" = "https"
+	test "$$(plutil -extract CFBundleURLTypes.1.CFBundleURLSchemes.0 raw $(APP_BUNDLE)/Contents/Info.plist)" = "file"
+	test "$$(plutil -extract CFBundleDocumentTypes.0.LSItemContentTypes.0 raw $(APP_BUNDLE)/Contents/Info.plist)" = "public.html"
 	test "$$(plutil -extract CFBundleIconFile raw $(APP_BUNDLE)/Contents/Info.plist)" = "AppIcon.icns"
 	test -f $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	codesign --verify --deep --strict --verbose=2 $(APP_BUNDLE)
@@ -100,11 +103,11 @@ $(BUILD_DIR)/%Tests: Tests/%Tests.m Tests/LRTestSupport.h $(CORE_SOURCES)
 
 $(BUILD_DIR)/LRAppDelegateTests: Tests/LRAppDelegateTests.m Tests/LRTestSupport.h $(APP_LIBRARY_SOURCES) $(CORE_SOURCES)
 	mkdir -p $(BUILD_DIR)
-	$(CLANG) $(COMMON_FLAGS) $< $(APP_LIBRARY_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
+	$(CLANG) $(COMMON_FLAGS) $< $(APP_LIBRARY_SOURCES) $(CORE_SOURCES) $(APP_FRAMEWORKS) -o $@
 
 $(BUILD_DIR)/LRLaunchLifecycleTests: Tests/LRLaunchLifecycleTests.m Tests/LRTestSupport.h $(APP_LIBRARY_SOURCES) $(CORE_SOURCES)
 	mkdir -p $(BUILD_DIR)
-	$(CLANG) $(COMMON_FLAGS) $< $(APP_LIBRARY_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
+	$(CLANG) $(COMMON_FLAGS) $< $(APP_LIBRARY_SOURCES) $(CORE_SOURCES) $(APP_FRAMEWORKS) -o $@
 
 $(BUILD_DIR)/LRIconFactoryTests: Tests/LRIconFactoryTests.m Tests/LRTestSupport.h Sources/App/LRIconFactory.m Sources/App/LRIconFactory.h
 	mkdir -p $(BUILD_DIR)
@@ -122,7 +125,7 @@ $(APP_ICON): $(ICON_GENERATOR)
 
 $(BUILD_DIR)/LinkRouter: $(APP_SOURCES) $(CORE_SOURCES)
 	mkdir -p $(BUILD_DIR)
-	$(CLANG) $(COMMON_FLAGS) $(APP_SOURCES) $(CORE_SOURCES) -framework Cocoa -o $@
+	$(CLANG) $(COMMON_FLAGS) $(APP_SOURCES) $(CORE_SOURCES) $(APP_FRAMEWORKS) -o $@
 
 clean:
 	rm -rf $(BUILD_DIR) $(APP_BUNDLE)

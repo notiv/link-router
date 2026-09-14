@@ -10,7 +10,8 @@
         "console.cloud.google.com"
       ],
       "name" : "Work",
-      "profile" : "Profile 1"
+      "profile" : "Profile 1",
+      "private" : true
     },
     {
       "app" : "Safari",

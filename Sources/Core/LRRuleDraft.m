@@ -8,6 +8,7 @@
     draft.hostsText = [rule.hosts componentsJoinedByString:@", "];
     draft.application = rule.target.application;
     draft.profile = rule.target.profile;
+    draft.privateBrowsing = rule.target.privateBrowsing;
     return draft;
 }
 
@@ -17,6 +18,7 @@
     draft.hostsText = @"example.com";
     draft.application = LRBrowserApplicationSafari;
     draft.profile = nil;
+    draft.privateBrowsing = NO;
     return draft;
 }
 
@@ -36,7 +38,9 @@
     LRBrowserTarget *target = [LRBrowserTarget targetWithApplication:self.application
                                                              profile:self.application == LRBrowserApplicationChrome
                                                                          ? self.profile
-                                                                         : nil];
+                                                                         : nil
+                                                     privateBrowsing:self.application == LRBrowserApplicationChrome &&
+                                                                         self.privateBrowsing];
     return [LRRoutingRule ruleWithName:name hosts:hosts target:target];
 }
 

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Provide a small, dependency-free Objective-C library that turns an HTTP or HTTPS URL and a human-readable JSON config into a browser target. Rules are evaluated from top to bottom, and the first matching rule wins.
+Provide a small, dependency-free Objective-C library that turns an HTTP, HTTPS, or local file URL and a human-readable JSON config into a browser target. Host rules are evaluated from top to bottom, and the first matching rule wins; file URLs use the fallback target.
 
 The JSON format is:
 
@@ -14,13 +14,14 @@ The JSON format is:
       "name": "Work",
       "hosts": ["*.example.com", "console.cloud.google.com"],
       "app": "Google Chrome",
-      "profile": "Profile 1"
+      "profile": "Profile 1",
+      "private": true
     }
   ]
 }
 ```
 
-An exact host matches only itself. A leading `*.` matches both the base domain and its subdomains. Matching is case-insensitive. Only `http` and `https` URLs are routable.
+An exact host matches only itself. A leading `*.` matches both the base domain and its subdomains. Matching is case-insensitive. `http`, `https`, and local `file` URLs are routable; file URLs have no host match and use the fallback.
 
 ## Tech Stack
 
@@ -59,7 +60,7 @@ Types use an `LR` prefix and `UpperCamelCase`; methods and properties use `lower
 
 ## Boundaries
 
-- Always: validate URL schemes, host patterns, app names, and Chrome profile directory names.
+- Always: validate URL schemes, host patterns, app names, Chrome profile directory names, and private-mode compatibility.
 - Ask first: change the config schema incompatibly or add a dependency.
 - Never: execute config text as code, interpolate config into a shell command, or overwrite an invalid existing config automatically.
 
@@ -67,7 +68,7 @@ Types use an `LR` prefix and `UpperCamelCase`; methods and properties use `lower
 
 - The sample JSON round-trips without losing rule order.
 - First-match routing, wildcard routing, and fallback behavior are covered by passing tests.
-- Invalid schemes, host patterns, empty rules, and unsafe profile values produce actionable errors.
+- Invalid schemes, host patterns, empty rules, unsafe profile values, and Safari private targets produce actionable errors.
 - A default config is created only when the config file does not already exist.
 
 ## Open Questions

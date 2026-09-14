@@ -12,8 +12,16 @@
 @end
 
 @interface LRConfigWindowController (Testing)
+- (void)defaultBrowserChanged:(id)sender;
 - (void)reload:(id)sender;
 - (void)save:(id)sender;
+@end
+
+@interface LRRuleTableController (Testing)
+- (NSView *)tableView:(NSTableView *)tableView
+    viewForTableColumn:(NSTableColumn *)tableColumn
+                   row:(NSInteger)row;
+- (void)privateChanged:(NSButton *)sender;
 @end
 
 static void TestStatusMenuActionsHaveExplicitTargets(void) {
@@ -53,9 +61,16 @@ static void TestEditorSaveReloadFlow(void) {
     [controller reload:nil];
     NSPopUpButton *fallbackPicker = [controller valueForKey:@"defaultBrowserPicker"];
     NSTextField *fallbackProfile = [controller valueForKey:@"defaultProfileField"];
+    NSButton *fallbackPrivate = [controller valueForKey:@"defaultPrivateButton"];
     LRRuleTableController *ruleTable = [controller valueForKey:@"ruleTableController"];
+    LRAssert(!fallbackPrivate.enabled,
+             "the editor should disable private browsing for a Safari fallback");
     [fallbackPicker selectItemAtIndex:LRBrowserApplicationChrome];
+    [controller defaultBrowserChanged:nil];
+    LRAssert(fallbackPrivate.enabled,
+             "the editor should offer private browsing when Chrome is selected");
     fallbackProfile.stringValue = @"Profile 2";
+    fallbackPrivate.state = NSControlStateValueOn;
     LRRoutingRule *rule = [LRRoutingRule
         ruleWithName:@"Work"
                hosts:@[@"*.example.com"]
@@ -69,15 +84,47 @@ static void TestEditorSaveReloadFlow(void) {
              "the editor should save its selected fallback browser");
     LRAssert([reloaded.defaultTarget.profile isEqualToString:@"Profile 2"],
              "the editor should save the fallback Chrome profile");
+    LRAssert(reloaded.defaultTarget.privateBrowsing,
+             "the editor should save the fallback private-browsing option");
     LRAssert([reloaded.rules.firstObject.name isEqualToString:@"Work"],
              "the editor should save and reload ordered routing rules");
     [NSFileManager.defaultManager removeItemAtURL:directory error:nil];
+}
+
+static void TestRuleTablePrivateControlUpdatesChromeTarget(void) {
+    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
+    (void)controller.view;
+    LRRoutingRule *rule = [LRRoutingRule
+        ruleWithName:@"Work"
+               hosts:@[@"example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome profile:nil]];
+    [controller setRoutingRules:@[rule]];
+
+    NSTableView *tableView = [controller valueForKey:@"tableView"];
+    NSTableColumn *privateColumn = nil;
+    for (NSTableColumn *column in tableView.tableColumns) {
+        if ([column.identifier isEqualToString:@"private"]) {
+            privateColumn = column;
+            break;
+        }
+    }
+    NSButton *privateButton = (NSButton *)[controller tableView:tableView
+                                            viewForTableColumn:privateColumn
+                                                           row:0];
+    LRAssert(privateButton != nil && privateButton.enabled,
+             "a Chrome rule should expose an enabled private control");
+    privateButton.state = NSControlStateValueOn;
+    [controller privateChanged:privateButton];
+
+    LRAssert(controller.routingRules.firstObject.target.privateBrowsing,
+             "the private control should update the Chrome target");
 }
 
 int main(void) {
     @autoreleasepool {
         TestStatusMenuActionsHaveExplicitTargets();
         TestEditorSaveReloadFlow();
+        TestRuleTablePrivateControlUpdatesChromeTarget();
         return LRFinishTests();
     }
 }

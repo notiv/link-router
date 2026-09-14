@@ -10,6 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, copy) NSString *hostsText;
 @property(nonatomic) LRBrowserApplication application;
 @property(nonatomic, copy, nullable) NSString *profile;
+@property(nonatomic) BOOL privateBrowsing;
 
 + (instancetype)draftFromRule:(LRRoutingRule *)rule;
 + (instancetype)newDraft;

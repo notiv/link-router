@@ -47,18 +47,40 @@ static void TestExactWildcardPrecedenceAndFallback(void) {
              "unmatched URL should use fallback");
 }
 
-static void TestRejectsNonWebURLs(void) {
+static void TestFileURLsUseFallback(void) {
     NSError *error = nil;
-    LRRouteResult *result = [TestRouter() routeForURL:[NSURL fileURLWithPath:@"/tmp/private"]
+    LRRouteResult *result = [TestRouter() routeForURL:[NSURL fileURLWithPath:@"/tmp/page.html"]
                                                 error:&error];
-    LRAssert(result == nil, "file URL should be rejected");
-    LRAssert(error.code == LRRoutingErrorUnsupportedScheme, "file URL should report its scheme");
+    LRAssert(result != nil && error == nil, "a local file URL should be accepted");
+    LRAssert(result.ruleName == nil, "a file URL should not match host rules");
+    LRAssert(result.target.application == LRBrowserApplicationSafari,
+             "a file URL should use the configured fallback");
+}
+
+static void TestRejectsUnsupportedSchemes(void) {
+    NSError *error = nil;
+    LRRouteResult *result = [TestRouter() routeForURL:[NSURL URLWithString:@"ftp://example.com/file"]
+                                                error:&error];
+    LRAssert(result == nil, "an FTP URL should be rejected");
+    LRAssert(error.code == LRRoutingErrorUnsupportedScheme,
+             "an unsupported URL should report its scheme");
+}
+
+static void TestRejectsRemoteFileURLs(void) {
+    NSError *error = nil;
+    LRRouteResult *result = [TestRouter() routeForURL:
+        [NSURL URLWithString:@"file://files.example.com/page.html"] error:&error];
+    LRAssert(result == nil, "a remote file URL should be rejected");
+    LRAssert(error.code == LRRoutingErrorRemoteFileURL,
+             "a remote file URL should report that only local files are supported");
 }
 
 int main(void) {
     @autoreleasepool {
         TestExactWildcardPrecedenceAndFallback();
-        TestRejectsNonWebURLs();
+        TestFileURLsUseFallback();
+        TestRejectsUnsupportedSchemes();
+        TestRejectsRemoteFileURLs();
         return LRFinishTests();
     }
 }

@@ -14,6 +14,7 @@ static BOOL LRSetConfigurationError(NSError **error, NSString *message) {
 static LRBrowserTarget *LRTargetFromDictionary(NSDictionary *dictionary, NSError **error) {
     NSString *app = dictionary[@"app"];
     id profileValue = dictionary[@"profile"];
+    id privateValue = dictionary[@"private"];
     if (![app isKindOfClass:NSString.class]) {
         LRSetConfigurationError(error, @"Every browser target needs an 'app' string.");
         return nil;
@@ -22,12 +23,20 @@ static LRBrowserTarget *LRTargetFromDictionary(NSDictionary *dictionary, NSError
         LRSetConfigurationError(error, @"A Chrome 'profile' must be a string.");
         return nil;
     }
+    if (privateValue != nil && CFGetTypeID((__bridge CFTypeRef)privateValue) != CFBooleanGetTypeID()) {
+        LRSetConfigurationError(error, @"A browser target's 'private' setting must be true or false.");
+        return nil;
+    }
+    BOOL privateBrowsing = [privateValue boolValue];
     if ([app isEqualToString:@"Safari"]) {
-        return [LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil];
+        return [LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                              profile:nil
+                                      privateBrowsing:privateBrowsing];
     }
     if ([app isEqualToString:@"Google Chrome"]) {
         return [LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome
-                                              profile:profileValue];
+                                              profile:profileValue
+                                      privateBrowsing:privateBrowsing];
     }
     LRSetConfigurationError(error,
                             [NSString stringWithFormat:@"Unsupported browser '%@'. Use Safari or Google Chrome.", app]);
@@ -39,6 +48,9 @@ static NSDictionary *LRDictionaryFromTarget(LRBrowserTarget *target) {
     if (target.application == LRBrowserApplicationChrome && target.profile.length > 0) {
         dictionary[@"profile"] = target.profile;
     }
+    if (target.privateBrowsing) {
+        dictionary[@"private"] = @YES;
+    }
     return dictionary;
 }
 
@@ -46,6 +58,10 @@ static BOOL LRValidateTarget(LRBrowserTarget *target, NSString *location, NSErro
     if (target == nil) {
         return LRSetConfigurationError(error,
                                        [NSString stringWithFormat:@"%@ has no browser target.", location]);
+    }
+    if (target.privateBrowsing && target.application != LRBrowserApplicationChrome) {
+        return LRSetConfigurationError(error,
+                                       [NSString stringWithFormat:@"%@ requests private browsing, which is supported only for Google Chrome.", location]);
     }
     if (target.application != LRBrowserApplicationChrome || target.profile == nil) {
         return YES;

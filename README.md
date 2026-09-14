@@ -1,6 +1,6 @@
 # LinkRouter
 
-LinkRouter is a small native macOS menu-bar app that sends each web link to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included native editor writes that file for you.
+LinkRouter is a small native macOS menu-bar app that sends web links and local HTML files to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included native editor writes that file for you.
 
 It follows the shape of the utility shown in [Thorsten Ball's LinkRouter post](https://x.com/thorstenball/status/2098327328845656224): first-match host rules, an explicit fallback, and Chrome profile routing.
 
@@ -44,16 +44,21 @@ Opening LinkRouter directly presents the rule editor. After closing that window,
 2. Choose **Configure Rules…**.
 3. Select the fallback browser.
 4. Add rules in priority order. Each rule has a name, one or more host patterns, a browser, and an optional Chrome profile directory.
-5. Use **Move Up** and **Move Down** when two rules can both match the same host.
-6. Choose **Save**. New links use the saved rules immediately.
+5. Enable **Private** when a Chrome target should open in an Incognito window.
+6. Use **Move Up** and **Move Down** when two rules can both match the same host.
+7. Choose **Save**. New links use the saved rules immediately.
 
 An exact pattern such as `console.cloud.google.com` matches only that host. A leading wildcard such as `*.example.com` matches both `example.com` and any subdomain such as `docs.example.com`. Matching is case-insensitive. This first version intentionally matches hosts, not URL paths or query parameters.
 
+Local `file://` URLs and HTML documents have no web hostname, so they always use the configured fallback browser, profile, and private-window setting.
+
 For Chrome, enter the profile directory—not necessarily the visible profile name. Open `chrome://version` in that profile and use the final component of **Profile Path**, typically `Default`, `Profile 1`, or `Profile 2`. Leave the field empty to let Chrome choose normally.
+
+Private windows are supported for Google Chrome through its Incognito launch mode and can be combined with a profile. Safari targets intentionally disable this option because Safari has no supported API for opening a URL in a guaranteed private window.
 
 ## Make LinkRouter the default browser
 
-Launch the packaged app, open its menu, and choose **Set as Default Browser…**. LinkRouter asks macOS to associate both `http` and `https`; macOS may show a consent prompt. The app never changes the default automatically.
+Launch the packaged app, open its menu, and choose **Set as Default Browser…**. LinkRouter asks macOS to associate `http`, `https`, `file`, and HTML documents; macOS may show consent prompts. The app never changes defaults automatically.
 
 The app must stay running to route links. It has no Dock icon; quit it from **Quit LinkRouter** in the menu.
 
@@ -75,19 +80,20 @@ You can also choose **Open Config File…**, edit JSON directly, and then choose
       "name": "Work",
       "hosts": ["*.example.com"],
       "app": "Google Chrome",
-      "profile": "Profile 1"
+      "profile": "Profile 1",
+      "private": true
     }
   ]
 }
 ```
 
-Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profile` is optional. Invalid JSON is reported in the menu and is never overwritten; LinkRouter temporarily falls back to Safari until the file is fixed and reloaded.
+Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profile` and Boolean `private` setting are optional; omitted `private` values default to `false`. Invalid JSON is reported in the menu and is never overwritten; LinkRouter temporarily falls back to Safari until the file is fixed and reloaded.
 
 ## Privacy and safety
 
 - All routing and configuration stay on the Mac.
 - LinkRouter has no network client, telemetry, analytics, or browsing-history log.
-- Only `http` and `https` URLs are accepted.
+- Only `http`, `https`, and local `file` URLs are accepted.
 - Browser names, host patterns, and Chrome profile directories are validated.
 - Chrome is launched with a fixed executable and a typed argument array; config values never pass through a shell.
 - Config saves are atomic and use user-only file permissions.
@@ -113,6 +119,9 @@ The implementation follows Apple's documented APIs and bundle keys:
 - [`NSApplicationDelegate.application(_:open:)`](https://developer.apple.com/documentation/appkit/nsapplicationdelegate/application(_:open:)) delivers declared URL types to the app.
 - [`NSWorkspace.open(_:withApplicationAt:configuration:completionHandler:)`](https://developer.apple.com/documentation/appkit/nsworkspace/open(_:withapplicationat:configuration:completionhandler:)) opens a URL in an explicitly selected app.
 - [`NSWorkspace.setDefaultApplication(at:toOpenURLsWithScheme:completion:)`](https://developer.apple.com/documentation/appkit/nsworkspace/setdefaultapplication(at:toopenurlswithscheme:completion:)) requests the default handler and allows macOS to obtain consent.
-- [`CFBundleURLTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleurltypes) declares `http` and `https` support.
+- [`NSWorkspace.setDefaultApplication(at:toOpen:completion:)`](https://developer.apple.com/documentation/appkit/nsworkspace/setdefaultapplication%28at%3Atoopen%3Acompletion%3A%29) requests the default handler for HTML documents.
+- [`CFBundleURLTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleurltypes) declares `http`, `https`, and `file` support.
+- [`CFBundleDocumentTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundledocumenttypes) declares HTML document support.
 - [`CFBundleIconFile`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleiconfile) identifies the icon in the app bundle's resources.
 - [`LSUIElement`](https://developer.apple.com/documentation/bundleresources/information-property-list/lsuielement) keeps this agent app out of the Dock.
+- [Chromium's `kIncognito` switch](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/chrome/common/chrome_switches.cc) launches Chrome directly in Incognito mode.

@@ -27,10 +27,11 @@ static void TestConfigurationToChromeLaunchPlan(void) {
     LRAssert([route.ruleName isEqualToString:@"Work"], "the matching rule should be retained");
     LRAssert(plan.mode == LRLaunchModeExecutable, "profile routing should use Chrome's executable");
     NSArray<NSString *> *expectedArguments = @[
-        @"--profile-directory=Profile 1", @"https://docs.example.com/guide?q=profiles"
+        @"--profile-directory=Profile 1", @"--incognito",
+        @"https://docs.example.com/guide?q=profiles"
     ];
     LRAssert([plan.arguments isEqualToArray:expectedArguments],
-             "the launch plan should preserve the profile and URL as separate arguments");
+             "the launch plan should preserve profile, private mode, and URL as separate arguments");
 }
 
 int main(void) {

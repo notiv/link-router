@@ -7,7 +7,8 @@ static LRRouterConfiguration *ReferenceConfiguration(void) {
     NSString *JSON = @"{\"default\":{\"app\":\"Safari\"},"
                      "\"rules\":[{\"name\":\"Work\","
                      "\"hosts\":[\"*.example.com\"],"
-                     "\"app\":\"Google Chrome\",\"profile\":\"Profile 1\"}]}";
+                     "\"app\":\"Google Chrome\",\"profile\":\"Profile 1\","
+                     "\"private\":true}]}";
     NSError *error = nil;
     LRRouterConfiguration *configuration =
         [LRRouterConfiguration configurationFromData:[JSON dataUsingEncoding:NSUTF8StringEncoding]
@@ -28,6 +29,9 @@ static void TestConfigurationDecoding(void) {
     LRAssert(rule.target.application == LRBrowserApplicationChrome,
              "rule target should be Chrome");
     LRAssert([rule.target.profile isEqualToString:@"Profile 1"], "profile should decode");
+    LRAssert(rule.target.privateBrowsing, "private browsing should decode");
+    LRAssert(!configuration.defaultTarget.privateBrowsing,
+             "missing private setting should remain backward-compatible and default to false");
 }
 
 static void TestValidation(void) {
@@ -51,6 +55,17 @@ static void TestValidation(void) {
                                                               profile:@"../../Other"]
                          rules:@[]];
     LRAssert(![unsafeProfile validate:&error], "path-like Chrome profile should be rejected");
+
+    error = nil;
+    LRBrowserTarget *privateSafari =
+        [LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                       profile:nil
+                               privateBrowsing:YES];
+    LRRouterConfiguration *unsupportedPrivateMode = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:privateSafari
+                         rules:@[]];
+    LRAssert(![unsupportedPrivateMode validate:&error],
+             "Safari private browsing should be rejected because it has no supported launch API");
 }
 
 static void TestRoundTrip(void) {
@@ -62,6 +77,20 @@ static void TestRoundTrip(void) {
     LRAssert(decoded != nil && error == nil, "encoded configuration should decode");
     LRAssert([decoded.rules.firstObject.name isEqualToString:@"Work"],
              "round trip should preserve rule order and values");
+    LRAssert(decoded.rules.firstObject.target.privateBrowsing,
+             "round trip should preserve private browsing");
+}
+
+static void TestPrivateBrowsingMustBeBoolean(void) {
+    NSString *JSON = @"{\"default\":{\"app\":\"Google Chrome\",\"private\":1},\"rules\":[]}";
+    NSError *error = nil;
+    LRRouterConfiguration *configuration = [LRRouterConfiguration
+        configurationFromData:[JSON dataUsingEncoding:NSUTF8StringEncoding]
+                         error:&error];
+
+    LRAssert(configuration == nil, "a numeric private value should be rejected");
+    LRAssert(error.code == LRRoutingErrorInvalidConfiguration,
+             "an invalid private value should return a configuration error");
 }
 
 static void TestEncodedConfigurationSizeLimit(void) {
@@ -98,6 +127,7 @@ int main(void) {
         TestConfigurationDecoding();
         TestValidation();
         TestRoundTrip();
+        TestPrivateBrowsingMustBeBoolean();
         TestEncodedConfigurationSizeLimit();
         return LRFinishTests();
     }

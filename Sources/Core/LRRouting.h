@@ -8,6 +8,7 @@ typedef NS_ERROR_ENUM(LRRoutingErrorDomain, LRRoutingErrorCode) {
     LRRoutingErrorInvalidConfiguration = 1,
     LRRoutingErrorUnsupportedScheme = 2,
     LRRoutingErrorMissingHost = 3,
+    LRRoutingErrorRemoteFileURL = 4,
 };
 
 typedef NS_ENUM(NSUInteger, LRBrowserApplication) {
@@ -24,10 +25,14 @@ typedef NS_ENUM(NSUInteger, LRLaunchMode) {
 
 @property(nonatomic, readonly) LRBrowserApplication application;
 @property(nonatomic, copy, readonly, nullable) NSString *profile;
+@property(nonatomic, readonly) BOOL privateBrowsing;
 @property(nonatomic, copy, readonly) NSString *displayName;
 
 + (instancetype)targetWithApplication:(LRBrowserApplication)application
                                profile:(nullable NSString *)profile;
++ (instancetype)targetWithApplication:(LRBrowserApplication)application
+                               profile:(nullable NSString *)profile
+                       privateBrowsing:(BOOL)privateBrowsing;
 
 @end
 

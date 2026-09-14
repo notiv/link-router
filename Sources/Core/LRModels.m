@@ -5,16 +5,24 @@ NSErrorDomain const LRRoutingErrorDomain = @"com.linkrouter.routing";
 @interface LRBrowserTarget ()
 @property(nonatomic, readwrite) LRBrowserApplication application;
 @property(nonatomic, copy, readwrite, nullable) NSString *profile;
+@property(nonatomic, readwrite) BOOL privateBrowsing;
 @end
 
 @implementation LRBrowserTarget
 
 + (instancetype)targetWithApplication:(LRBrowserApplication)application
                                profile:(NSString *)profile {
+    return [self targetWithApplication:application profile:profile privateBrowsing:NO];
+}
+
++ (instancetype)targetWithApplication:(LRBrowserApplication)application
+                               profile:(NSString *)profile
+                       privateBrowsing:(BOOL)privateBrowsing {
     LRBrowserTarget *target = [[self alloc] init];
     target.application = application;
     NSString *trimmed = [profile stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     target.profile = trimmed.length > 0 ? trimmed : nil;
+    target.privateBrowsing = privateBrowsing;
     return target;
 }
 

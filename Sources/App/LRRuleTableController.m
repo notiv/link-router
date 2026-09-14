@@ -6,6 +6,7 @@ static NSString *const LRNameColumn = @"name";
 static NSString *const LRHostsColumn = @"hosts";
 static NSString *const LRBrowserColumn = @"browser";
 static NSString *const LRProfileColumn = @"profile";
+static NSString *const LRPrivateColumn = @"private";
 
 @interface LRRuleTableController () <NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate>
 @property(nonatomic, strong) NSTableView *tableView;
@@ -28,7 +29,7 @@ static NSString *const LRProfileColumn = @"profile";
 - (void)loadView {
     NSView *container = [[NSView alloc] initWithFrame:NSZeroRect];
     NSTextField *help = [NSTextField wrappingLabelWithString:
-        @"Rules are checked from top to bottom. Separate host patterns with commas or new lines; *.example.com also matches example.com."];
+        @"Rules are checked from top to bottom. Separate host patterns with commas or new lines; *.example.com also matches example.com. Local files use the fallback."];
     help.textColor = NSColor.secondaryLabelColor;
 
     self.tableView = [[NSTableView alloc] initWithFrame:NSZeroRect];
@@ -42,6 +43,7 @@ static NSString *const LRProfileColumn = @"profile";
     [self addColumn:LRHostsColumn title:@"Host patterns" width:270];
     [self addColumn:LRBrowserColumn title:@"Browser" width:125];
     [self addColumn:LRProfileColumn title:@"Chrome profile" width:130];
+    [self addColumn:LRPrivateColumn title:@"Private" width:70];
 
     NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
     scrollView.documentView = self.tableView;
@@ -90,7 +92,7 @@ static NSString *const LRProfileColumn = @"profile";
     NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:identifier];
     column.title = title;
     column.width = width;
-    column.minWidth = 90;
+    column.minWidth = MIN(width, 90.0);
     [self.tableView addTableColumn:column];
 }
 
@@ -137,6 +139,16 @@ static NSString *const LRProfileColumn = @"profile";
         [picker setAccessibilityLabel:[NSString stringWithFormat:@"Browser for rule %ld", row + 1]];
         return picker;
     }
+    if ([identifier isEqualToString:LRPrivateColumn]) {
+        NSButton *checkbox = [NSButton checkboxWithTitle:@"" target:self action:@selector(privateChanged:)];
+        checkbox.state = draft.privateBrowsing ? NSControlStateValueOn : NSControlStateValueOff;
+        checkbox.enabled = draft.application == LRBrowserApplicationChrome;
+        checkbox.tag = row;
+        checkbox.controlSize = NSControlSizeSmall;
+        [checkbox setAccessibilityLabel:[NSString stringWithFormat:@"Private Chrome window for rule %ld",
+                                                                  row + 1]];
+        return checkbox;
+    }
 
     NSTextField *field = [[NSTextField alloc] initWithFrame:NSZeroRect];
     field.delegate = self;
@@ -179,9 +191,20 @@ static NSString *const LRProfileColumn = @"profile";
 - (void)browserChanged:(NSPopUpButton *)sender {
     LRRuleDraft *draft = self.drafts[(NSUInteger)sender.tag];
     draft.application = (LRBrowserApplication)sender.indexOfSelectedItem;
+    if (draft.application != LRBrowserApplicationChrome) {
+        draft.privateBrowsing = NO;
+    }
     NSIndexSet *row = [NSIndexSet indexSetWithIndex:(NSUInteger)sender.tag];
-    NSIndexSet *column = [NSIndexSet indexSetWithIndex:3];
-    [self.tableView reloadDataForRowIndexes:row columnIndexes:column];
+    NSIndexSet *columns = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(3, 2)];
+    [self.tableView reloadDataForRowIndexes:row columnIndexes:columns];
+}
+
+- (void)privateChanged:(NSButton *)sender {
+    if (sender.tag < 0 || (NSUInteger)sender.tag >= self.drafts.count) {
+        return;
+    }
+    LRRuleDraft *draft = self.drafts[(NSUInteger)sender.tag];
+    draft.privateBrowsing = sender.state == NSControlStateValueOn;
 }
 
 - (void)addRule:(id)sender {

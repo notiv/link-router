@@ -1,5 +1,7 @@
 #import "LRAppDelegate.h"
 
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+
 #import "LRBrowserLauncher.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
@@ -14,6 +16,10 @@
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) LRConfigWindowController *configWindowController;
+- (void)requestDefaultApplicationAtURL:(NSURL *)applicationURL
+                         forURLSchemes:(NSArray<NSString *> *)schemes
+                                 index:(NSUInteger)index
+                            completion:(void (^)(NSError *error))completion;
 @end
 
 @implementation LRAppDelegate
@@ -143,6 +149,30 @@
                        }];
 }
 
+- (void)requestDefaultApplicationAtURL:(NSURL *)applicationURL
+                         forURLSchemes:(NSArray<NSString *> *)schemes
+                                 index:(NSUInteger)index
+                            completion:(void (^)(NSError *error))completion {
+    if (index >= schemes.count) {
+        completion(nil);
+        return;
+    }
+    [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
+                                      toOpenURLsWithScheme:schemes[index]
+                                               completionHandler:^(NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error != nil) {
+                completion(error);
+                return;
+            }
+            [self requestDefaultApplicationAtURL:applicationURL
+                                   forURLSchemes:schemes
+                                           index:index + 1
+                                      completion:completion];
+        });
+    }];
+}
+
 - (void)setAsDefaultBrowser:(id)sender {
     (void)sender;
     NSURL *applicationURL = NSBundle.mainBundle.bundleURL;
@@ -150,29 +180,28 @@
         [self setStatus:@"Launch the packaged LinkRouter.app before setting the default."];
         return;
     }
-    [self setStatus:@"Requesting default-browser access…"];
-    [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
-                                      toOpenURLsWithScheme:@"http"
-                                               completionHandler:^(NSError *HTTPError) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (HTTPError != nil) {
-                [self setStatus:[@"Default-browser error: "
-                                    stringByAppendingString:HTTPError.localizedDescription]];
-                return;
-            }
-            [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
-                                              toOpenURLsWithScheme:@"https"
-                                                       completionHandler:^(NSError *HTTPSError) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (HTTPSError != nil) {
-                        [self setStatus:[@"Default-browser error: "
-                                            stringByAppendingString:HTTPSError.localizedDescription]];
-                    } else {
-                        [self setStatus:@"LinkRouter is the default web browser."];
-                    }
-                });
-            }];
-        });
+    [self setStatus:@"Requesting default-browser and HTML-file access…"];
+    [self requestDefaultApplicationAtURL:applicationURL
+                           forURLSchemes:@[@"http", @"https", @"file"]
+                                   index:0
+                              completion:^(NSError *schemeError) {
+        if (schemeError != nil) {
+            [self setStatus:[@"Default-handler error: "
+                                stringByAppendingString:schemeError.localizedDescription]];
+            return;
+        }
+        [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:applicationURL
+                                              toOpenContentType:UTTypeHTML
+                                               completionHandler:^(NSError *HTMLError) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (HTMLError != nil) {
+                    [self setStatus:[@"HTML-file association error: "
+                                        stringByAppendingString:HTMLError.localizedDescription]];
+                } else {
+                    [self setStatus:@"LinkRouter handles web links, file URLs, and HTML documents."];
+                }
+            });
+        }];
     }];
 }
 

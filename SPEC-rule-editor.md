@@ -49,7 +49,8 @@ The UI uses system colors, spacing, typography, and keyboard-accessible native c
 
 - Opening LinkRouter directly presents the editor, and reopening the running app restores it.
 - The menu opens a dedicated configuration window.
-- The user can change the fallback, add/delete/reorder rules, edit host patterns, select Safari or Chrome, and set a Chrome profile.
+- The user can change the fallback, add/delete/reorder rules, edit host patterns, select Safari or Chrome, set a Chrome profile, and request a private Chrome window.
+- Private-window controls are disabled for Safari targets.
 - Save is disabled or fails visibly when validation fails.
 - A successful save updates the JSON file and routing behavior without relaunching the app.
 - The config file can still be opened in the user's text editor.

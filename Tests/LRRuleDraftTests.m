@@ -9,6 +9,7 @@ static void TestDraftConvertsEditableTextToRule(void) {
     draft.hostsText = @" *.Example.com, console.cloud.google.com\n\napi.example.org ";
     draft.application = LRBrowserApplicationChrome;
     draft.profile = @" Profile 1 ";
+    draft.privateBrowsing = YES;
 
     LRRoutingRule *rule = draft.routingRule;
     LRAssert([rule.name isEqualToString:@"Work"], "draft should trim the rule name");
@@ -21,6 +22,7 @@ static void TestDraftConvertsEditableTextToRule(void) {
              "draft should preserve browser selection");
     LRAssert([rule.target.profile isEqualToString:@"Profile 1"],
              "browser target should trim the Chrome profile");
+    LRAssert(rule.target.privateBrowsing, "draft should preserve private browsing");
 }
 
 static void TestDraftRoundTrip(void) {
@@ -37,6 +39,8 @@ static void TestDraftRoundTrip(void) {
              "unchanged draft should preserve its host patterns");
     LRAssert(roundTrip.target.application == LRBrowserApplicationSafari,
              "unchanged draft should preserve Safari");
+    LRAssert(!roundTrip.target.privateBrowsing,
+             "a Safari draft should not enable unsupported private browsing");
 }
 
 int main(void) {

@@ -45,12 +45,23 @@ static BOOL LRHostMatchesPattern(NSString *host, NSString *pattern) {
 
 - (LRRouteResult *)routeForURL:(NSURL *)URL error:(NSError **)error {
     NSString *scheme = URL.scheme.lowercaseString;
-    if (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"]) {
+    BOOL isFileURL = [scheme isEqualToString:@"file"];
+    if (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"] && !isFileURL) {
         LRSetRoutingError(error,
                           LRRoutingErrorUnsupportedScheme,
-                          [NSString stringWithFormat:@"LinkRouter only opens HTTP and HTTPS URLs, not '%@'.",
+                          [NSString stringWithFormat:@"LinkRouter only opens HTTP, HTTPS, and file URLs, not '%@'.",
                                                      scheme.length > 0 ? scheme : @"unknown"]);
         return nil;
+    }
+    if (isFileURL) {
+        NSString *host = URL.host.lowercaseString;
+        if (host.length > 0 && ![host isEqualToString:@"localhost"]) {
+            LRSetRoutingError(error,
+                              LRRoutingErrorRemoteFileURL,
+                              @"LinkRouter only opens local file URLs.");
+            return nil;
+        }
+        return [[LRRouteResult alloc] initWithTarget:self.configuration.defaultTarget ruleName:nil];
     }
     NSString *host = URL.host;
     if (host.length == 0) {
