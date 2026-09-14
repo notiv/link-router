@@ -3,8 +3,8 @@ CLANG := xcrun clang
 BUILD_DIR := .build/local
 APP_BUNDLE := dist/LinkRouter.app
 ICON_GENERATOR := $(BUILD_DIR)/GenerateIconset
-ICONSET_DIR := $(BUILD_DIR)/AppIcon.iconset
 APP_ICON := $(BUILD_DIR)/AppIcon.icns
+VERIFIED_ICONSET_DIR := $(BUILD_DIR)/VerifiedAppIcon.iconset
 VERSION := $(shell plutil -extract CFBundleShortVersionString raw Packaging/Info.plist)
 INSTALLER := dist/LinkRouter-$(VERSION).dmg
 INSTALLER_STAGING := $(BUILD_DIR)/installer
@@ -83,6 +83,9 @@ verify-bundle: app
 	! plutil -extract CFBundleDocumentTypes raw $(APP_BUNDLE)/Contents/Info.plist >/dev/null 2>&1
 	test "$$(plutil -extract CFBundleIconFile raw $(APP_BUNDLE)/Contents/Info.plist)" = "AppIcon.icns"
 	test -f $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
+	rm -rf $(VERIFIED_ICONSET_DIR)
+	iconutil -c iconset -o $(VERIFIED_ICONSET_DIR) $(APP_ICON)
+	test -f $(VERIFIED_ICONSET_DIR)/icon_512x512@2x.png
 	test ! -e $(APP_BUNDLE)/Contents/Resources/Settings.html
 	codesign --verify --deep --strict --verbose=2 $(APP_BUNDLE)
 
@@ -115,10 +118,7 @@ $(ICON_GENERATOR): Tools/GenerateIconset.m Sources/App/LRIconFactory.m Sources/A
 	$(CLANG) $(COMMON_FLAGS) Tools/GenerateIconset.m Sources/App/LRIconFactory.m -framework Cocoa -o $@
 
 $(APP_ICON): $(ICON_GENERATOR)
-	rm -rf $(ICONSET_DIR)
-	mkdir -p $(ICONSET_DIR)
-	$(ICON_GENERATOR) $(ICONSET_DIR)
-	iconutil -c icns $(ICONSET_DIR) -o $(APP_ICON)
+	$(ICON_GENERATOR) $(APP_ICON)
 
 $(BUILD_DIR)/LinkRouter: $(APP_SOURCES) $(CORE_SOURCES)
 	mkdir -p $(BUILD_DIR)

@@ -13,6 +13,10 @@
 - The menu-bar menu now focuses on default-browser setup, login launch, opening the rule editor, and quitting; JSON and reload actions remain available inside the editor.
 - Rule and fallback screens now share consistent alignment, compact browser/profile controls, and appearance-aware system materials.
 
+### Fixed
+
+- Clean builds now generate the complete multi-resolution app icon without depending on the broken macOS 26 `iconutil` assembly path.
+
 ### Removed
 
 - The embedded WebKit settings surface and its bundled HTML asset.
