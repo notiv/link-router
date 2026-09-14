@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <CoreServices/CoreServices.h>
 
 #import "LRAppDelegate.h"
 #import "LRBrowserLauncher.h"
@@ -12,6 +13,7 @@
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender
                     hasVisibleWindows:(BOOL)hasVisibleWindows;
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)URLs;
+- (BOOL)shouldOpenRuleEditorForAppleEvent:(NSAppleEventDescriptor *)event;
 @end
 
 @interface LRRecordingAppDelegate : LRAppDelegate
@@ -79,9 +81,37 @@ static void TestExplicitApplicationOpenShowsEditor(void) {
     LRAssert(delegate.editorRequested, "reopening the running app should show the editor");
 }
 
+static NSAppleEventDescriptor *OpenApplicationEventWithLaunchReason(AEKeyword launchReason) {
+    NSAppleEventDescriptor *event = [NSAppleEventDescriptor
+        appleEventWithEventClass:kCoreEventClass
+                         eventID:kAEOpenApplication
+                targetDescriptor:nil
+                        returnID:kAutoGenerateReturnID
+                   transactionID:kAnyTransactionID];
+    [event setParamDescriptor:[NSAppleEventDescriptor descriptorWithEnumCode:launchReason]
+                  forKeyword:keyAEPropData];
+    return event;
+}
+
+static void TestLoginLaunchDoesNotOpenEditor(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    NSAppleEventDescriptor *loginEvent =
+        OpenApplicationEventWithLaunchReason(keyAELaunchedAsLogInItem);
+    NSAppleEventDescriptor *serviceEvent =
+        OpenApplicationEventWithLaunchReason(keyAELaunchedAsServiceItem);
+
+    LRAssert(![delegate shouldOpenRuleEditorForAppleEvent:loginEvent],
+             "a login-item launch should start silently in the menu bar");
+    LRAssert(![delegate shouldOpenRuleEditorForAppleEvent:serviceEvent],
+             "a service-item launch should start silently in the menu bar");
+    LRAssert([delegate shouldOpenRuleEditorForAppleEvent:nil],
+             "an ordinary app launch should continue to open the editor");
+}
+
 int main(void) {
     @autoreleasepool {
         TestExplicitApplicationOpenShowsEditor();
+        TestLoginLaunchDoesNotOpenEditor();
         TestFileOpenEventRoutesToFallback();
         return LRFinishTests();
     }

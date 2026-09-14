@@ -10,6 +10,7 @@ Deliver a native, menu-bar-only macOS app named LinkRouter. macOS sends it HTTP,
 - `NSStatusItem` for the menu-bar interface
 - `NSApplicationDelegate.application(_:open:)` for URL delivery
 - `NSWorkspace` for app lookup, launching, and default-handler registration
+- `SMAppService.mainAppService` for user-controlled launch at login
 - `NSTask` with typed arguments for Chrome profile and Incognito launches; no shell
 
 ## Commands
@@ -49,12 +50,13 @@ All user-interface mutations occur on the main thread.
 ## Boundaries
 
 - Always: resolve installed apps by bundle identifier and pass URLs/profile names as separate arguments.
-- Ask first: install into `/Applications`, change the user's default browser outside an explicit button click, or add login-item behavior.
+- Ask first: install into `/Applications` or change the user's default browser outside an explicit button click.
 - Never: route schemes other than HTTP, HTTPS, and local files; invoke `sh -c`; log browsing history; or collect telemetry.
 
 ## Success Criteria
 
 - The packaged app launches as a status item and does not appear in the Dock.
+- A checked menu option registers the app to launch silently at login, and reflects approval changes made in System Settings.
 - Its bundle declares itself capable of handling `http`, `https`, `file`, and HTML documents.
 - A menu action requests LinkRouter as the default for web links, file URLs, and HTML documents through supported AppKit APIs.
 - Incoming URLs are sent to the resolved target, including the configured Chrome profile and Incognito option.

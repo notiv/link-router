@@ -38,6 +38,8 @@ To keep the app somewhere permanent, quit it and copy `dist/LinkRouter.app` to `
 
 Opening LinkRouter directly presents the rule editor. After closing that window, the app continues running from its branching-arrow menu-bar icon so it can route links. Opening the app again brings the editor back.
 
+To have LinkRouter available automatically, open its menu and enable **Start at Login**. The checkmark follows the current macOS Login Items state; if approval is required, LinkRouter opens the relevant System Settings pane. Login launches are silent, so only the menu-bar icon appears—the rule editor still opens for an ordinary app launch.
+
 ## Configure routing
 
 1. Click LinkRouter's branching-arrow icon in the menu bar.
@@ -124,4 +126,6 @@ The implementation follows Apple's documented APIs and bundle keys:
 - [`CFBundleDocumentTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundledocumenttypes) declares HTML document support.
 - [`CFBundleIconFile`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleiconfile) identifies the icon in the app bundle's resources.
 - [`LSUIElement`](https://developer.apple.com/documentation/bundleresources/information-property-list/lsuielement) keeps this agent app out of the Dock.
+- [`SMAppService.mainAppService`](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp?language=objc) registers the main app to launch at login and exposes its current approval state.
+- [Launch Apple Event constants](https://developer.apple.com/documentation/coreservices/apple_events/1556410-launch_apple_event_constants) identify login-item launches so the editor can remain closed.
 - [Chromium's `kIncognito` switch](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/chrome/common/chrome_switches.cc) launches Chrome directly in Incognito mode.

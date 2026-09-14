@@ -6,15 +6,20 @@
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
 #import "LRIconFactory.h"
+#import "LRLoginItemController.h"
 #import "LRRouting.h"
 
-@interface LRAppDelegate ()
+#import <CoreServices/CoreServices.h>
+
+@interface LRAppDelegate () <NSMenuDelegate>
 @property(nonatomic, strong) LRConfigStore *configStore;
 @property(nonatomic, strong) LRRouterConfiguration *configuration;
 @property(nonatomic, strong) LRRouter *router;
 @property(nonatomic, strong) id<LRBrowserLaunching> browserLauncher;
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
+@property(nonatomic, strong) NSMenuItem *startAtLoginMenuItem;
+@property(nonatomic, strong) id<LRLoginItemControlling> loginItemController;
 @property(nonatomic, strong) LRConfigWindowController *configWindowController;
 - (NSMenu *)buildMenu;
 - (void)requestDefaultApplicationAtURL:(NSURL *)applicationURL
@@ -30,6 +35,7 @@
     if (self) {
         _configStore = [[LRConfigStore alloc] initWithConfigURL:LRConfigStore.defaultConfigURL];
         _browserLauncher = [[LRBrowserLauncher alloc] init];
+        _loginItemController = [[LRLoginItemController alloc] init];
         _configuration = LRRouterConfiguration.defaultConfiguration;
         _router = [[LRRouter alloc] initWithConfiguration:_configuration error:nil];
     }
@@ -44,13 +50,25 @@
 
 - (BOOL)applicationShouldOpenUntitledFile:(NSApplication *)sender {
     (void)sender;
-    return YES;
+    return [self shouldOpenRuleEditorForAppleEvent:
+        NSAppleEventManager.sharedAppleEventManager.currentAppleEvent];
 }
 
 - (BOOL)applicationOpenUntitledFile:(NSApplication *)sender {
     (void)sender;
+    if (![self shouldOpenRuleEditorForAppleEvent:
+            NSAppleEventManager.sharedAppleEventManager.currentAppleEvent]) {
+        return YES;
+    }
     [self openRuleEditor:nil];
     return YES;
+}
+
+- (BOOL)shouldOpenRuleEditorForAppleEvent:(NSAppleEventDescriptor *)event {
+    if (event.eventID != kAEOpenApplication) { return YES; }
+    AEKeyword launchReason = [[event paramDescriptorForKeyword:keyAEPropData] enumCodeValue];
+    return launchReason != keyAELaunchedAsLogInItem &&
+           launchReason != keyAELaunchedAsServiceItem;
 }
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender
@@ -78,6 +96,7 @@
 
 - (NSMenu *)buildMenu {
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"LinkRouter"];
+    menu.delegate = self;
     self.statusMenuItem = [[NSMenuItem alloc] initWithTitle:@"Loading configuration…"
                                                     action:nil
                                              keyEquivalent:@""];
@@ -88,6 +107,11 @@
                                                      action:@selector(setAsDefaultBrowser:)
                                               keyEquivalent:@""];
     defaultBrowserItem.target = self;
+    self.startAtLoginMenuItem = [menu addItemWithTitle:@"Start at Login"
+                                               action:@selector(toggleStartAtLogin:)
+                                        keyEquivalent:@""];
+    self.startAtLoginMenuItem.target = self;
+    [self updateStartAtLoginMenuItem];
     NSMenuItem *configureItem = [menu addItemWithTitle:@"Configure Rules…"
                                                 action:@selector(openRuleEditor:)
                                          keyEquivalent:@","];
@@ -106,6 +130,52 @@
                                     keyEquivalent:@"q"];
     quitItem.target = self;
     return menu;
+}
+
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+    (void)menu;
+    [self updateStartAtLoginMenuItem];
+}
+
+- (void)updateStartAtLoginMenuItem {
+    LRLoginItemState state = self.loginItemController.state;
+    self.startAtLoginMenuItem.title = @"Start at Login";
+    self.startAtLoginMenuItem.state = NSControlStateValueOff;
+    if (state == LRLoginItemStateEnabled) {
+        self.startAtLoginMenuItem.state = NSControlStateValueOn;
+    } else if (state == LRLoginItemStateRequiresApproval) {
+        self.startAtLoginMenuItem.title = @"Start at Login (Approval Required)…";
+        self.startAtLoginMenuItem.state = NSControlStateValueMixed;
+    }
+}
+
+- (void)toggleStartAtLogin:(id)sender {
+    (void)sender;
+    LRLoginItemState state = self.loginItemController.state;
+    if (state == LRLoginItemStateRequiresApproval) {
+        [self.loginItemController openSystemSettings];
+        [self setStatus:@"Approve LinkRouter in System Settings → Login Items."];
+        [self updateStartAtLoginMenuItem];
+        return;
+    }
+
+    BOOL enable = state != LRLoginItemStateEnabled;
+    NSError *error = nil;
+    if (![self.loginItemController setEnabled:enable error:&error]) {
+        [self setStatus:[@"Login-item error: "
+                            stringByAppendingString:error.localizedDescription ?: @"Unknown error"]];
+        [self updateStartAtLoginMenuItem];
+        return;
+    }
+
+    [self updateStartAtLoginMenuItem];
+    if (self.loginItemController.state == LRLoginItemStateRequiresApproval) {
+        [self.loginItemController openSystemSettings];
+        [self setStatus:@"Approve LinkRouter in System Settings → Login Items."];
+    } else {
+        [self setStatus:enable ? @"LinkRouter will start at login."
+                               : @"LinkRouter will not start at login."];
+    }
 }
 
 - (void)loadConfiguration {
