@@ -3,6 +3,7 @@
 #import "LRBrowserLauncher.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
+#import "LRIconFactory.h"
 #import "LRRouting.h"
 
 @interface LRAppDelegate ()
@@ -63,8 +64,7 @@
 - (void)buildStatusMenu {
     self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
     NSStatusBarButton *button = self.statusItem.button;
-    button.image = [NSImage imageWithSystemSymbolName:@"arrow.triangle.branch"
-                            accessibilityDescription:@"LinkRouter"];
+    button.image = [LRIconFactory menuBarIcon];
     button.toolTip = @"LinkRouter";
 
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"LinkRouter"];
