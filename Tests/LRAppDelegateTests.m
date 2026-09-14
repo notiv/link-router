@@ -20,6 +20,7 @@
 @interface LRRuleTableController (Testing)
 - (void)domainModeChanged:(NSSegmentedControl *)sender;
 - (void)privateChanged:(NSButton *)sender;
+- (void)selectLocalFiles:(id)sender;
 @end
 
 static void TestStatusMenuActionsHaveExplicitTargets(void) {
@@ -57,18 +58,11 @@ static void TestEditorSaveReloadFlow(void) {
              savedConfiguration = configuration;
          }];
     [controller reload:nil];
-    NSPopUpButton *fallbackPicker = [controller valueForKey:@"defaultBrowserPicker"];
-    NSTextField *fallbackProfile = [controller valueForKey:@"defaultProfileField"];
-    NSButton *fallbackPrivate = [controller valueForKey:@"defaultPrivateButton"];
     LRRuleTableController *ruleTable = [controller valueForKey:@"ruleTableController"];
-    LRAssert(!fallbackPrivate.enabled,
-             "the editor should disable private browsing for a Safari fallback");
-    [fallbackPicker selectItemAtIndex:LRBrowserApplicationChrome];
-    [controller defaultBrowserChanged:nil];
-    LRAssert(fallbackPrivate.enabled,
-             "the editor should offer private browsing when Chrome is selected");
-    fallbackProfile.stringValue = @"Profile 2";
-    fallbackPrivate.state = NSControlStateValueOn;
+    [ruleTable setDefaultTarget:[LRBrowserTarget
+        targetWithApplication:LRBrowserApplicationChrome
+                       profile:@"Profile 2"
+               privateBrowsing:YES]];
     LRRoutingRule *rule = [LRRoutingRule
         ruleWithName:@"Work"
                hosts:@[@"*.example.com"]
@@ -139,11 +133,28 @@ static void TestRulesEditorUsesAReferenceStyleSidebar(void) {
              "the redesigned rules editor should use a headerless sidebar list");
     LRAssert(tableView.tableColumns.count == 1,
              "the sidebar should present each route as one scannable item");
+    NSButton *fallbackButton = [controller valueForKey:@"fallbackButton"];
+    NSButton *localFilesButton = [controller valueForKey:@"localFilesButton"];
+    LRAssert([fallbackButton.title containsString:@"Unmatched links"],
+             "the sidebar should expose fallback routing as Unmatched links");
+    LRAssert([localFilesButton.title containsString:@"Local files"],
+             "the sidebar should expose local-file routing explicitly");
+}
+
+static void TestLocalFilesExplainThatTheyFollowTheFallback(void) {
+    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
+    (void)controller.view;
+    [controller selectLocalFiles:nil];
+    NSTextField *detailDescription = [controller valueForKey:@"detailDescriptionLabel"];
+
+    LRAssert([detailDescription.stringValue containsString:@"Unmatched links"],
+             "the local-files detail should explain the inherited fallback behavior");
 }
 
 int main(void) {
     @autoreleasepool {
         TestRulesEditorUsesAReferenceStyleSidebar();
+        TestLocalFilesExplainThatTheyFollowTheFallback();
         TestEditorSaveReloadFlow();
         TestRuleTablePrivateControlUpdatesChromeTarget();
         TestRulesEditorPresentsWildcardHostsAsDomainModes();

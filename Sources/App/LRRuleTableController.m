@@ -7,6 +7,12 @@ static NSString *const LRRuleNameField = @"rule-name";
 static NSString *const LRDomainField = @"domain";
 static NSString *const LRProfileField = @"profile";
 
+typedef NS_ENUM(NSInteger, LRSpecialSelection) {
+    LRSpecialSelectionNone = -1,
+    LRSpecialSelectionFallback = 0,
+    LRSpecialSelectionLocalFiles = 1,
+};
+
 @interface LRRuleTableController () <NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate>
 @property(nonatomic, strong) NSTableView *tableView;
 @property(nonatomic, strong) NSMutableArray<LRRuleDraft *> *drafts;
@@ -21,6 +27,11 @@ static NSString *const LRProfileField = @"profile";
 @property(nonatomic, strong) NSButton *removeButton;
 @property(nonatomic, strong) NSButton *moveUpButton;
 @property(nonatomic, strong) NSButton *moveDownButton;
+@property(nonatomic, strong) NSButton *fallbackButton;
+@property(nonatomic, strong) NSButton *localFilesButton;
+@property(nonatomic, strong) LRBrowserTarget *fallbackTarget;
+@property(nonatomic) LRSpecialSelection specialSelection;
+@property(nonatomic, strong) NSTextField *detailDescriptionLabel;
 @end
 
 @implementation LRRuleTableController
@@ -29,6 +40,9 @@ static NSString *const LRProfileField = @"profile";
     self = [super initWithNibName:nil bundle:nil];
     if (self) {
         _drafts = [NSMutableArray array];
+        _fallbackTarget = [LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                                         profile:nil];
+        _specialSelection = LRSpecialSelectionFallback;
     }
     return self;
 }
@@ -99,7 +113,39 @@ static NSString *const LRProfileField = @"profile";
         [sidebarFooter.heightAnchor constraintEqualToConstant:38],
     ]];
 
-    for (NSView *view in @[rulesLabel, ruleScrollView, sidebarFooter]) {
+    NSView *specialSection = [[NSView alloc] initWithFrame:NSZeroRect];
+    NSBox *specialDivider = [[NSBox alloc] initWithFrame:NSZeroRect];
+    specialDivider.boxType = NSBoxSeparator;
+    NSTextField *everythingElseLabel = [self sectionLabelWithString:@"Everything else"];
+    self.fallbackButton = [self specialButtonWithTitle:@"Unmatched links"
+                                                 action:@selector(selectFallback:)];
+    self.localFilesButton = [self specialButtonWithTitle:@"Local files"
+                                                   action:@selector(selectLocalFiles:)];
+    for (NSView *view in @[
+             specialDivider, everythingElseLabel, self.fallbackButton, self.localFilesButton
+         ]) {
+        view.translatesAutoresizingMaskIntoConstraints = NO;
+        [specialSection addSubview:view];
+    }
+    [NSLayoutConstraint activateConstraints:@[
+        [specialDivider.topAnchor constraintEqualToAnchor:specialSection.topAnchor],
+        [specialDivider.leadingAnchor constraintEqualToAnchor:specialSection.leadingAnchor],
+        [specialDivider.trailingAnchor constraintEqualToAnchor:specialSection.trailingAnchor],
+        [everythingElseLabel.topAnchor constraintEqualToAnchor:specialDivider.bottomAnchor constant:8],
+        [everythingElseLabel.leadingAnchor constraintEqualToAnchor:specialSection.leadingAnchor constant:16],
+        [everythingElseLabel.trailingAnchor constraintEqualToAnchor:specialSection.trailingAnchor constant:-12],
+        [self.fallbackButton.topAnchor constraintEqualToAnchor:everythingElseLabel.bottomAnchor constant:4],
+        [self.fallbackButton.leadingAnchor constraintEqualToAnchor:specialSection.leadingAnchor constant:7],
+        [self.fallbackButton.trailingAnchor constraintEqualToAnchor:specialSection.trailingAnchor constant:-7],
+        [self.localFilesButton.topAnchor constraintEqualToAnchor:self.fallbackButton.bottomAnchor constant:1],
+        [self.localFilesButton.leadingAnchor constraintEqualToAnchor:self.fallbackButton.leadingAnchor],
+        [self.localFilesButton.trailingAnchor constraintEqualToAnchor:self.fallbackButton.trailingAnchor],
+        [self.localFilesButton.bottomAnchor constraintEqualToAnchor:specialSection.bottomAnchor constant:-7],
+        [self.fallbackButton.heightAnchor constraintEqualToConstant:28],
+        [self.localFilesButton.heightAnchor constraintEqualToConstant:28],
+    ]];
+
+    for (NSView *view in @[rulesLabel, ruleScrollView, sidebarFooter, specialSection]) {
         view.translatesAutoresizingMaskIntoConstraints = NO;
         [sidebar addSubview:view];
     }
@@ -113,7 +159,10 @@ static NSString *const LRProfileField = @"profile";
         [ruleScrollView.bottomAnchor constraintEqualToAnchor:sidebarFooter.topAnchor],
         [sidebarFooter.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor],
         [sidebarFooter.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor],
-        [sidebarFooter.bottomAnchor constraintEqualToAnchor:sidebar.bottomAnchor],
+        [sidebarFooter.bottomAnchor constraintEqualToAnchor:specialSection.topAnchor],
+        [specialSection.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor],
+        [specialSection.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor],
+        [specialSection.bottomAnchor constraintEqualToAnchor:sidebar.bottomAnchor],
         [sidebar.widthAnchor constraintEqualToConstant:214],
     ]];
 
@@ -153,6 +202,7 @@ static NSString *const LRProfileField = @"profile";
 
     self.view = container;
     [self updateSelectionState];
+    [self updateSpecialButtons];
     [self rebuildDetail];
 }
 
@@ -164,6 +214,16 @@ static NSString *const LRProfileField = @"profile";
     button.font = [NSFont systemFontOfSize:14];
     [button setAccessibilityLabel:accessibilityLabel];
     [button.widthAnchor constraintEqualToConstant:26].active = YES;
+    return button;
+}
+
+- (NSButton *)specialButtonWithTitle:(NSString *)title action:(SEL)action {
+    NSButton *button = [NSButton buttonWithTitle:title target:self action:action];
+    button.bezelStyle = NSBezelStyleInline;
+    button.alignment = NSTextAlignmentLeft;
+    button.font = [NSFont systemFontOfSize:12.5 weight:NSFontWeightSemibold];
+    button.lineBreakMode = NSLineBreakByTruncatingMiddle;
+    [button setAccessibilityLabel:title];
     return button;
 }
 
@@ -182,13 +242,28 @@ static NSString *const LRProfileField = @"profile";
     }
     [self.tableView reloadData];
     if (self.drafts.count > 0) {
+        self.specialSelection = LRSpecialSelectionNone;
         [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0]
                     byExtendingSelection:NO];
     } else {
+        self.specialSelection = LRSpecialSelectionFallback;
         [self.tableView deselectAll:nil];
     }
     [self updateSelectionState];
+    [self updateSpecialButtons];
     [self rebuildDetail];
+}
+
+- (void)setDefaultTarget:(LRBrowserTarget *)target {
+    (void)self.view;
+    self.fallbackTarget = target;
+    [self updateSpecialButtons];
+    if (self.specialSelection != LRSpecialSelectionNone) { [self rebuildDetail]; }
+}
+
+- (LRBrowserTarget *)defaultTarget {
+    [self commitCurrentEditing];
+    return self.fallbackTarget;
 }
 
 - (NSArray<LRRoutingRule *> *)routingRules {
@@ -198,6 +273,10 @@ static NSString *const LRProfileField = @"profile";
         [rules addObject:draft.routingRule];
     }
     return rules;
+}
+
+- (NSUInteger)ruleCount {
+    return self.drafts.count;
 }
 
 - (void)commitCurrentEditing {
@@ -272,6 +351,18 @@ static NSString *const LRProfileField = @"profile";
         [self.detailStack removeArrangedSubview:view];
         [view removeFromSuperview];
     }
+    self.detailDescriptionLabel = nil;
+    self.domainPatterns = nil;
+    self.domainFields = nil;
+    self.domainModeControls = nil;
+    if (self.specialSelection == LRSpecialSelectionFallback) {
+        [self rebuildFallbackDetail];
+        return;
+    }
+    if (self.specialSelection == LRSpecialSelectionLocalFiles) {
+        [self rebuildLocalFilesDetail];
+        return;
+    }
     LRRuleDraft *draft = self.selectedDraft;
     if (draft == nil) {
         NSTextField *emptyTitle = [NSTextField labelWithString:@"No rules yet"];
@@ -324,6 +415,59 @@ static NSString *const LRProfileField = @"profile";
     [self.detailStack addArrangedSubview:domainsSection];
     [domainsSection.widthAnchor constraintEqualToAnchor:self.detailStack.widthAnchor].active = YES;
 
+    [self addBrowserSectionForApplication:draft.application
+                                  profile:draft.profile
+                          privateBrowsing:draft.privateBrowsing];
+}
+
+- (void)rebuildFallbackDetail {
+    [self addDetailHeading:@"Unmatched links"
+               description:@"Any http or https link whose host matches no rule above."];
+    [self addBrowserSectionForApplication:self.fallbackTarget.application
+                                  profile:self.fallbackTarget.profile
+                          privateBrowsing:self.fallbackTarget.privateBrowsing];
+}
+
+- (void)rebuildLocalFilesDetail {
+    [self addDetailHeading:@"Local files"
+               description:@"file:// URLs and HTML documents opened from disk always follow Unmatched links."];
+    NSStackView *section = [[NSStackView alloc] initWithFrame:NSZeroRect];
+    section.orientation = NSUserInterfaceLayoutOrientationVertical;
+    section.alignment = NSLayoutAttributeLeading;
+    section.spacing = 9;
+    [section addArrangedSubview:[self sectionLabelWithString:@"Open in"]];
+    NSTextField *summary = [NSTextField labelWithString:
+        [NSString stringWithFormat:@"Same as Unmatched links — %@",
+                                   [self summaryForTarget:self.fallbackTarget]]];
+    summary.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
+    [section addArrangedSubview:summary];
+    NSButton *editFallback = [NSButton buttonWithTitle:@"Edit Unmatched Links"
+                                                target:self
+                                                action:@selector(selectFallback:)];
+    editFallback.bezelStyle = NSBezelStyleInline;
+    editFallback.contentTintColor = NSColor.controlAccentColor;
+    [section addArrangedSubview:editFallback];
+    [self.detailStack addArrangedSubview:section];
+}
+
+- (void)addDetailHeading:(NSString *)heading description:(NSString *)description {
+    NSTextField *title = [NSTextField labelWithString:heading];
+    title.font = [NSFont systemFontOfSize:20 weight:NSFontWeightSemibold];
+    self.detailDescriptionLabel = [NSTextField wrappingLabelWithString:description];
+    self.detailDescriptionLabel.font = [NSFont systemFontOfSize:12.5];
+    self.detailDescriptionLabel.textColor = NSColor.secondaryLabelColor;
+    [self.detailStack addArrangedSubview:title];
+    [self.detailStack setCustomSpacing:4 afterView:title];
+    [self.detailStack addArrangedSubview:self.detailDescriptionLabel];
+    [self.detailDescriptionLabel.widthAnchor constraintEqualToAnchor:self.detailStack.widthAnchor].active = YES;
+    NSBox *separator = [self separator];
+    [self.detailStack addArrangedSubview:separator];
+    [separator.widthAnchor constraintEqualToAnchor:self.detailStack.widthAnchor].active = YES;
+}
+
+- (void)addBrowserSectionForApplication:(LRBrowserApplication)application
+                                 profile:(NSString *)profile
+                         privateBrowsing:(BOOL)privateBrowsing {
     NSStackView *browserSection = [[NSStackView alloc] initWithFrame:NSZeroRect];
     browserSection.orientation = NSUserInterfaceLayoutOrientationVertical;
     browserSection.alignment = NSLayoutAttributeLeading;
@@ -333,11 +477,11 @@ static NSString *const LRProfileField = @"profile";
                                                             trackingMode:NSSegmentSwitchTrackingSelectOne
                                                                   target:self
                                                                   action:@selector(browserChanged:)];
-    self.browserControl.selectedSegment = (NSInteger)draft.application;
+    self.browserControl.selectedSegment = (NSInteger)application;
     self.browserControl.controlSize = NSControlSizeSmall;
     [self.browserControl setAccessibilityLabel:@"Destination browser"];
     [browserSection addArrangedSubview:self.browserControl];
-    if (draft.application == LRBrowserApplicationChrome) {
+    if (application == LRBrowserApplicationChrome) {
         NSStackView *profileRow = [[NSStackView alloc] initWithFrame:NSZeroRect];
         profileRow.orientation = NSUserInterfaceLayoutOrientationHorizontal;
         profileRow.alignment = NSLayoutAttributeCenterY;
@@ -348,7 +492,7 @@ static NSString *const LRProfileField = @"profile";
         self.profileField = [[NSTextField alloc] initWithFrame:NSZeroRect];
         self.profileField.identifier = LRProfileField;
         self.profileField.delegate = self;
-        self.profileField.stringValue = draft.profile ?: @"";
+        self.profileField.stringValue = profile ?: @"";
         self.profileField.placeholderString = @"Default";
         self.profileField.font = [NSFont monospacedSystemFontOfSize:12.5 weight:NSFontWeightRegular];
         self.profileField.controlSize = NSControlSizeSmall;
@@ -361,11 +505,11 @@ static NSString *const LRProfileField = @"profile";
     self.privateButton = [NSButton checkboxWithTitle:@"Private window"
                                               target:self
                                               action:@selector(privateChanged:)];
-    self.privateButton.state = draft.privateBrowsing ? NSControlStateValueOn : NSControlStateValueOff;
-    self.privateButton.enabled = draft.application == LRBrowserApplicationChrome;
+    self.privateButton.state = privateBrowsing ? NSControlStateValueOn : NSControlStateValueOff;
+    self.privateButton.enabled = application == LRBrowserApplicationChrome;
     [self.privateButton setAccessibilityLabel:@"Open in a private Chrome window"];
     [browserSection addArrangedSubview:self.privateButton];
-    if (draft.application == LRBrowserApplicationSafari) {
+    if (application == LRBrowserApplicationSafari) {
         NSTextField *note = [NSTextField labelWithString:@"Private windows are not available for Safari."];
         note.font = [NSFont systemFontOfSize:11.5];
         note.textColor = NSColor.tertiaryLabelColor;
@@ -440,6 +584,16 @@ static NSString *const LRProfileField = @"profile";
 
 - (void)controlTextDidChange:(NSNotification *)notification {
     NSTextField *field = notification.object;
+    if (self.specialSelection == LRSpecialSelectionFallback &&
+        [field.identifier isEqualToString:LRProfileField]) {
+        self.fallbackTarget = [LRBrowserTarget
+            targetWithApplication:LRBrowserApplicationChrome
+                           profile:field.stringValue
+                   privateBrowsing:self.fallbackTarget.privateBrowsing];
+        [self updateSpecialButtons];
+        [self notifyChanged];
+        return;
+    }
     LRRuleDraft *draft = self.selectedDraft;
     if (draft == nil) { return; }
     if ([field.identifier isEqualToString:LRRuleNameField]) {
@@ -450,6 +604,7 @@ static NSString *const LRProfileField = @"profile";
     } else if ([field.identifier isEqualToString:LRDomainField]) {
         [self commitDomainPatterns];
     }
+    [self notifyChanged];
 }
 
 - (void)commitDomainPatterns {
@@ -469,6 +624,7 @@ static NSString *const LRProfileField = @"profile";
 - (void)domainModeChanged:(NSSegmentedControl *)sender {
     (void)sender;
     [self commitDomainPatterns];
+    [self notifyChanged];
 }
 
 - (void)addDomain:(id)sender {
@@ -478,6 +634,7 @@ static NSString *const LRProfileField = @"profile";
     self.selectedDraft.hostsText = [self.domainPatterns componentsJoinedByString:@", "];
     [self rebuildDetail];
     [self.view.window makeFirstResponder:self.domainFields.lastObject];
+    [self notifyChanged];
 }
 
 - (void)removeDomain:(NSButton *)sender {
@@ -490,23 +647,50 @@ static NSString *const LRProfileField = @"profile";
     }
     self.selectedDraft.hostsText = [self.domainPatterns componentsJoinedByString:@", "];
     [self rebuildDetail];
+    [self notifyChanged];
 }
 
 - (void)browserChanged:(NSSegmentedControl *)sender {
     [self commitCurrentEditing];
+    if (self.specialSelection == LRSpecialSelectionFallback) {
+        LRBrowserApplication application = (LRBrowserApplication)sender.selectedSegment;
+        self.fallbackTarget = [LRBrowserTarget
+            targetWithApplication:application
+                           profile:application == LRBrowserApplicationChrome
+                                       ? self.fallbackTarget.profile
+                                       : nil
+                   privateBrowsing:application == LRBrowserApplicationChrome &&
+                                       self.fallbackTarget.privateBrowsing];
+        [self updateSpecialButtons];
+        [self rebuildDetail];
+        [self notifyChanged];
+        return;
+    }
     LRRuleDraft *draft = self.selectedDraft;
     if (draft == nil) { return; }
     draft.application = (LRBrowserApplication)sender.selectedSegment;
     if (draft.application != LRBrowserApplicationChrome) { draft.privateBrowsing = NO; }
     [self reloadSelectedSidebarRow];
     [self rebuildDetail];
+    [self notifyChanged];
 }
 
 - (void)privateChanged:(NSButton *)sender {
+    if (self.specialSelection == LRSpecialSelectionFallback) {
+        if (self.fallbackTarget.application != LRBrowserApplicationChrome) { return; }
+        self.fallbackTarget = [LRBrowserTarget
+            targetWithApplication:LRBrowserApplicationChrome
+                           profile:self.fallbackTarget.profile
+                   privateBrowsing:sender.state == NSControlStateValueOn];
+        [self updateSpecialButtons];
+        [self notifyChanged];
+        return;
+    }
     LRRuleDraft *draft = self.selectedDraft;
     if (draft == nil || draft.application != LRBrowserApplicationChrome) { return; }
     draft.privateBrowsing = sender.state == NSControlStateValueOn;
     [self reloadSelectedSidebarRow];
+    [self notifyChanged];
 }
 
 - (void)addRule:(id)sender {
@@ -520,6 +704,7 @@ static NSString *const LRProfileField = @"profile";
     [self.tableView scrollRowToVisible:row];
     [self rebuildDetail];
     [self.view.window makeFirstResponder:self.nameField];
+    [self notifyChanged];
 }
 
 - (void)removeRule:(id)sender {
@@ -536,6 +721,7 @@ static NSString *const LRProfileField = @"profile";
     }
     [self updateSelectionState];
     [self rebuildDetail];
+    [self notifyChanged];
 }
 
 - (void)moveRuleUp:(id)sender {
@@ -558,11 +744,34 @@ static NSString *const LRProfileField = @"profile";
     [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)destination]
                 byExtendingSelection:NO];
     [self rebuildDetail];
+    [self notifyChanged];
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
     (void)notification;
+    if (self.tableView.selectedRow >= 0) { self.specialSelection = LRSpecialSelectionNone; }
     [self updateSelectionState];
+    [self updateSpecialButtons];
+    [self rebuildDetail];
+}
+
+- (void)selectFallback:(id)sender {
+    (void)sender;
+    [self commitCurrentEditing];
+    self.specialSelection = LRSpecialSelectionFallback;
+    [self.tableView deselectAll:nil];
+    [self updateSelectionState];
+    [self updateSpecialButtons];
+    [self rebuildDetail];
+}
+
+- (void)selectLocalFiles:(id)sender {
+    (void)sender;
+    [self commitCurrentEditing];
+    self.specialSelection = LRSpecialSelectionLocalFiles;
+    [self.tableView deselectAll:nil];
+    [self updateSelectionState];
+    [self updateSpecialButtons];
     [self rebuildDetail];
 }
 
@@ -578,6 +787,39 @@ static NSString *const LRProfileField = @"profile";
     self.removeButton.enabled = row >= 0;
     self.moveUpButton.enabled = row > 0;
     self.moveDownButton.enabled = row >= 0 && row + 1 < (NSInteger)self.drafts.count;
+}
+
+- (void)updateSpecialButtons {
+    if (self.fallbackButton == nil) { return; }
+    self.fallbackButton.title = [NSString stringWithFormat:@"Unmatched links   %@",
+                                                           [self shortSummaryForTarget:self.fallbackTarget]];
+    self.localFilesButton.title = @"Local files   follows above";
+    self.fallbackButton.state = self.specialSelection == LRSpecialSelectionFallback
+                                    ? NSControlStateValueOn
+                                    : NSControlStateValueOff;
+    self.localFilesButton.state = self.specialSelection == LRSpecialSelectionLocalFiles
+                                      ? NSControlStateValueOn
+                                      : NSControlStateValueOff;
+    [self.fallbackButton setAccessibilityLabel:[NSString
+        stringWithFormat:@"Unmatched links, opens in %@", [self summaryForTarget:self.fallbackTarget]]];
+    [self.localFilesButton setAccessibilityLabel:@"Local files, follows Unmatched links"];
+}
+
+- (NSString *)shortSummaryForTarget:(LRBrowserTarget *)target {
+    NSString *browser = target.application == LRBrowserApplicationSafari ? @"Safari" : @"Chrome";
+    return target.privateBrowsing ? [browser stringByAppendingString:@" · private"] : browser;
+}
+
+- (NSString *)summaryForTarget:(LRBrowserTarget *)target {
+    if (target.application == LRBrowserApplicationSafari) { return @"Safari"; }
+    NSString *profile = target.profile.length > 0 ? target.profile : @"Default";
+    return [NSString stringWithFormat:@"Google Chrome · %@%@",
+                                      profile,
+                                      target.privateBrowsing ? @" · private" : @""];
+}
+
+- (void)notifyChanged {
+    if (self.changeHandler != nil) { self.changeHandler(); }
 }
 
 @end

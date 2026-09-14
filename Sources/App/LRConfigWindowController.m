@@ -7,10 +7,8 @@
 @interface LRConfigWindowController ()
 @property(nonatomic, strong) LRConfigStore *configStore;
 @property(nonatomic, copy) LRConfigurationSavedHandler configurationSaved;
-@property(nonatomic, strong) NSPopUpButton *defaultBrowserPicker;
-@property(nonatomic, strong) NSTextField *defaultProfileField;
-@property(nonatomic, strong) NSButton *defaultPrivateButton;
 @property(nonatomic, strong) LRRuleTableController *ruleTableController;
+@property(nonatomic, strong) NSTextField *orderLabel;
 @property(nonatomic, strong) NSTextField *statusLabel;
 @end
 
@@ -19,13 +17,13 @@
 - (instancetype)initWithConfigStore:(LRConfigStore *)configStore
                configurationSaved:(LRConfigurationSavedHandler)configurationSaved {
     NSWindow *window = [[NSWindow alloc]
-        initWithContentRect:NSMakeRect(0, 0, 840, 510)
+        initWithContentRect:NSMakeRect(0, 0, 800, 520)
                   styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                             NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
                     backing:NSBackingStoreBuffered
                       defer:NO];
-    window.title = @"LinkRouter Rules";
-    window.minSize = NSMakeSize(760, 430);
+    window.title = @"LinkRouter";
+    window.minSize = NSMakeSize(720, 470);
     window.releasedWhenClosed = NO;
     self = [super initWithWindow:window];
     if (self) {
@@ -37,49 +35,19 @@
 }
 
 - (void)buildContent {
-    NSStackView *root = [[NSStackView alloc] initWithFrame:NSZeroRect];
-    root.orientation = NSUserInterfaceLayoutOrientationVertical;
-    root.alignment = NSLayoutAttributeLeading;
-    root.spacing = 16;
-    root.edgeInsets = NSEdgeInsetsMake(20, 20, 20, 20);
-
-    NSTextField *title = [NSTextField labelWithString:@"Link routing"];
-    title.font = [NSFont preferredFontForTextStyle:NSFontTextStyleTitle1 options:@{}];
-    NSTextField *subtitle = [NSTextField wrappingLabelWithString:
-        @"Choose a fallback, then add rules for sites that belong in a specific browser, Chrome profile, or private window."];
-    subtitle.textColor = NSColor.secondaryLabelColor;
-
-    NSTextField *defaultLabel = [NSTextField labelWithString:@"Fallback browser"];
-    defaultLabel.font = [NSFont systemFontOfSize:NSFont.systemFontSize weight:NSFontWeightSemibold];
-    self.defaultBrowserPicker = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
-    [self.defaultBrowserPicker addItemsWithTitles:@[@"Safari", @"Google Chrome"]];
-    self.defaultBrowserPicker.target = self;
-    self.defaultBrowserPicker.action = @selector(defaultBrowserChanged:);
-    [self.defaultBrowserPicker setAccessibilityLabel:@"Fallback browser"];
-    NSTextField *defaultProfileLabel = [NSTextField labelWithString:@"Chrome profile"];
-    self.defaultProfileField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.defaultProfileField.placeholderString = @"Chrome profile: Default or Profile 1";
-    [self.defaultProfileField setAccessibilityLabel:@"Fallback Chrome profile"];
-    [self.defaultProfileField.widthAnchor constraintGreaterThanOrEqualToConstant:230].active = YES;
-    self.defaultPrivateButton = [NSButton checkboxWithTitle:@"Private window"
-                                                    target:nil
-                                                    action:nil];
-    [self.defaultPrivateButton setAccessibilityLabel:@"Open fallback in a private Chrome window"];
-    NSStackView *fallback = [NSStackView stackViewWithViews:@[
-        defaultLabel, self.defaultBrowserPicker, defaultProfileLabel, self.defaultProfileField,
-        self.defaultPrivateButton
-    ]];
-    fallback.orientation = NSUserInterfaceLayoutOrientationHorizontal;
-    fallback.alignment = NSLayoutAttributeCenterY;
-    fallback.spacing = 12;
-
     self.ruleTableController = [[LRRuleTableController alloc] init];
     NSView *rulesView = self.ruleTableController.view;
+    __weak typeof(self) weakSelf = self;
+    self.ruleTableController.changeHandler = ^{
+        [weakSelf configurationEdited];
+    };
 
-    self.statusLabel = [NSTextField wrappingLabelWithString:@""];
-    self.statusLabel.textColor = NSColor.secondaryLabelColor;
-    [self.statusLabel setContentHuggingPriority:NSLayoutPriorityDefaultLow
-                                forOrientation:NSLayoutConstraintOrientationHorizontal];
+    self.orderLabel = [NSTextField labelWithString:@"0 rules · first match from the top wins"];
+    self.orderLabel.font = [NSFont systemFontOfSize:11.5];
+    self.orderLabel.textColor = NSColor.secondaryLabelColor;
+    self.statusLabel = [NSTextField labelWithString:@""];
+    self.statusLabel.font = [NSFont systemFontOfSize:11.5];
+    self.statusLabel.textColor = NSColor.tertiaryLabelColor;
     NSButton *openJSON = [NSButton buttonWithTitle:@"Open JSON"
                                            target:self
                                            action:@selector(openJSON:)];
@@ -91,28 +59,39 @@
                                        action:@selector(save:)];
     save.keyEquivalent = @"\r";
     save.bezelStyle = NSBezelStyleRounded;
+    for (NSButton *button in @[openJSON, reload, save]) {
+        button.controlSize = NSControlSizeSmall;
+    }
     NSStackView *footer = [NSStackView stackViewWithViews:@[
-        self.statusLabel, openJSON, reload, save
+        self.orderLabel, self.statusLabel, openJSON, reload, save
     ]];
     footer.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     footer.alignment = NSLayoutAttributeCenterY;
     footer.spacing = 8;
+    footer.edgeInsets = NSEdgeInsetsMake(6, 14, 6, 14);
+    [self.orderLabel setContentHuggingPriority:NSLayoutPriorityDefaultLow
+                                forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [self.statusLabel setContentHuggingPriority:NSLayoutPriorityDefaultHigh
+                                 forOrientation:NSLayoutConstraintOrientationHorizontal];
 
-    for (NSView *view in @[title, subtitle, fallback, rulesView, footer]) {
-        [root addArrangedSubview:view];
-        [view.widthAnchor constraintEqualToAnchor:root.widthAnchor constant:-40].active = YES;
+    NSBox *footerDivider = [[NSBox alloc] initWithFrame:NSZeroRect];
+    footerDivider.boxType = NSBoxSeparator;
+    for (NSView *view in @[rulesView, footerDivider, footer]) {
+        view.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.window.contentView addSubview:view];
     }
-    [rulesView setContentHuggingPriority:NSLayoutPriorityDefaultLow
-                          forOrientation:NSLayoutConstraintOrientationVertical];
-    [rulesView setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow
-                                        forOrientation:NSLayoutConstraintOrientationVertical];
-    root.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.window.contentView addSubview:root];
     [NSLayoutConstraint activateConstraints:@[
-        [root.topAnchor constraintEqualToAnchor:self.window.contentView.topAnchor],
-        [root.leadingAnchor constraintEqualToAnchor:self.window.contentView.leadingAnchor],
-        [root.trailingAnchor constraintEqualToAnchor:self.window.contentView.trailingAnchor],
-        [root.bottomAnchor constraintEqualToAnchor:self.window.contentView.bottomAnchor],
+        [rulesView.topAnchor constraintEqualToAnchor:self.window.contentView.topAnchor],
+        [rulesView.leadingAnchor constraintEqualToAnchor:self.window.contentView.leadingAnchor],
+        [rulesView.trailingAnchor constraintEqualToAnchor:self.window.contentView.trailingAnchor],
+        [rulesView.bottomAnchor constraintEqualToAnchor:footerDivider.topAnchor],
+        [footerDivider.leadingAnchor constraintEqualToAnchor:self.window.contentView.leadingAnchor],
+        [footerDivider.trailingAnchor constraintEqualToAnchor:self.window.contentView.trailingAnchor],
+        [footer.leadingAnchor constraintEqualToAnchor:self.window.contentView.leadingAnchor],
+        [footer.trailingAnchor constraintEqualToAnchor:self.window.contentView.trailingAnchor],
+        [footer.topAnchor constraintEqualToAnchor:footerDivider.bottomAnchor],
+        [footer.bottomAnchor constraintEqualToAnchor:self.window.contentView.bottomAnchor],
+        [footer.heightAnchor constraintEqualToConstant:38],
     ]];
 }
 
@@ -131,37 +110,24 @@
         [self showError:error.localizedDescription];
         return;
     }
-    [self.defaultBrowserPicker selectItemAtIndex:(NSInteger)configuration.defaultTarget.application];
-    self.defaultProfileField.stringValue = configuration.defaultTarget.profile ?: @"";
-    self.defaultPrivateButton.state = configuration.defaultTarget.privateBrowsing
-                                          ? NSControlStateValueOn
-                                          : NSControlStateValueOff;
+    [self.ruleTableController setDefaultTarget:configuration.defaultTarget];
     [self.ruleTableController setRoutingRules:configuration.rules];
-    [self updateDefaultProfileAvailability];
-    [self showStatus:[NSString stringWithFormat:@"Loaded %lu rule%@.",
-                                               (unsigned long)configuration.rules.count,
-                                               configuration.rules.count == 1 ? @"" : @"s"]];
+    [self updateOrderLabel:configuration.rules.count];
+    [self showStatus:@"Loaded"];
 }
 
 - (void)save:(id)sender {
     (void)sender;
-    LRBrowserApplication application =
-        (LRBrowserApplication)self.defaultBrowserPicker.indexOfSelectedItem;
-    LRBrowserTarget *fallback = [LRBrowserTarget targetWithApplication:application
-                                                               profile:application == LRBrowserApplicationChrome
-                                                                           ? self.defaultProfileField.stringValue
-                                                                           : nil
-                                                       privateBrowsing:application == LRBrowserApplicationChrome &&
-                                                                           self.defaultPrivateButton.state == NSControlStateValueOn];
     LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
-        initWithDefaultTarget:fallback
+        initWithDefaultTarget:self.ruleTableController.defaultTarget
                          rules:self.ruleTableController.routingRules];
     NSError *error = nil;
     if (![self.configStore saveConfiguration:configuration error:&error]) {
         [self showError:error.localizedDescription];
         return;
     }
-    [self showStatus:@"Saved. New URLs use these rules immediately."];
+    [self updateOrderLabel:configuration.rules.count];
+    [self showStatus:@"Saved"];
     self.configurationSaved(configuration);
 }
 
@@ -172,18 +138,15 @@
     }
 }
 
-- (void)defaultBrowserChanged:(id)sender {
-    (void)sender;
-    [self updateDefaultProfileAvailability];
+- (void)configurationEdited {
+    [self updateOrderLabel:self.ruleTableController.ruleCount];
+    [self showStatus:@"Edited"];
 }
 
-- (void)updateDefaultProfileAvailability {
-    BOOL isChrome = self.defaultBrowserPicker.indexOfSelectedItem == LRBrowserApplicationChrome;
-    self.defaultProfileField.enabled = isChrome;
-    self.defaultPrivateButton.enabled = isChrome;
-    if (!isChrome) {
-        self.defaultPrivateButton.state = NSControlStateValueOff;
-    }
+- (void)updateOrderLabel:(NSUInteger)ruleCount {
+    self.orderLabel.stringValue = [NSString stringWithFormat:@"%lu rule%@ · first match from the top wins",
+                                                             (unsigned long)ruleCount,
+                                                             ruleCount == 1 ? @"" : @"s"];
 }
 
 - (void)updateStatusLabel:(NSString *)message color:(NSColor *)color {
