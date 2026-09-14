@@ -139,6 +139,15 @@
     }
     .icon-button:hover:not(:disabled) { color: var(--text); background: rgba(0, 0, 0, .07); }
     .icon-button:disabled { opacity: .28; cursor: default; }
+    .icon-button.confirming {
+      width: auto;
+      padding: 0 8px;
+      color: #fff;
+      background: #d93025;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .icon-button.confirming:hover:not(:disabled) { color: #fff; background: #c5221f; }
     .everything-else { flex: none; padding: 8px; border-top: 1px solid var(--border); }
     .eyebrow {
       margin: 1px 9px 6px;
@@ -340,6 +349,7 @@
       let config = { default: { app: SAFARI }, rules: [] };
       let saved = JSON.stringify(config);
       let selection = { kind: "fallback" };
+      let pendingRuleRemoval = null;
 
       const byId = (id) => document.getElementById(id);
       const escapeHTML = (value) => String(value ?? "")
@@ -399,7 +409,14 @@
         });
         const ruleSelected = selection.kind === "rule";
         const index = ruleSelected ? selection.index : -1;
-        byId("remove-rule").disabled = !ruleSelected;
+        const removalPending = ruleSelected && pendingRuleRemoval === index;
+        const removeButton = byId("remove-rule");
+        removeButton.disabled = !ruleSelected;
+        removeButton.dataset.action = removalPending ? "confirm-remove" : "remove-rule";
+        removeButton.classList.toggle("confirming", removalPending);
+        removeButton.textContent = removalPending ? "Remove?" : "−";
+        removeButton.title = removalPending ? "Confirm removal" : "Remove selected rule";
+        removeButton.setAttribute("aria-label", removeButton.title);
         byId("move-up").disabled = !ruleSelected || index === 0;
         byId("move-down").disabled = !ruleSelected || index === config.rules.length - 1;
         byId("order-note").textContent = `${config.rules.length} ${config.rules.length === 1 ? "rule" : "rules"} · first match from the top wins`;
@@ -497,6 +514,10 @@
         const control = event.target.closest("[data-action]");
         if (!control || control.disabled) return;
         const action = control.dataset.action;
+        if (pendingRuleRemoval !== null && action !== "remove-rule" && action !== "confirm-remove") {
+          pendingRuleRemoval = null;
+          renderSidebar();
+        }
         if (action.startsWith("window-")) {
           post(action);
         } else if (action === "select") {
@@ -510,7 +531,12 @@
           renderAll();
           document.querySelector('[data-field="name"]')?.select();
         } else if (action === "remove-rule" && selection.kind === "rule") {
+          pendingRuleRemoval = selection.index;
+          renderSidebar();
+          byId("remove-rule").focus();
+        } else if (action === "confirm-remove" && selection.kind === "rule" && pendingRuleRemoval === selection.index) {
           config.rules.splice(selection.index, 1);
+          pendingRuleRemoval = null;
           if (config.rules.length) selection.index = Math.min(selection.index, config.rules.length - 1);
           else selection = { kind: "fallback" };
           renderAll();
@@ -572,6 +598,13 @@
       });
 
       document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && pendingRuleRemoval !== null) {
+          event.preventDefault();
+          pendingRuleRemoval = null;
+          renderSidebar();
+          byId("remove-rule").focus();
+          return;
+        }
         if (!event.metaKey) return;
         if (event.key.toLowerCase() === "s") {
           event.preventDefault();
@@ -589,6 +622,7 @@
             config = normalizedConfig(JSON.parse(new TextDecoder().decode(bytes)));
             saved = JSON.stringify(config);
             selection = config.rules.length ? { kind: "rule", index: 0 } : { kind: "fallback" };
+            pendingRuleRemoval = null;
             renderAll();
           } catch (error) {
             updateSaveState("Could not load settings", true);

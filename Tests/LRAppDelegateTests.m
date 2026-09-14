@@ -39,6 +39,12 @@ static void TestSettingsHTMLContainsTheReferenceComposition(void) {
              "the first sidebar rule should sit twelve pixels below the title bar");
     LRAssert([HTML containsString:@".text-input:focus-visible { outline: 0; }"],
              "text fields should rely on the shell focus ring instead of drawing a second outline");
+    LRAssert([HTML containsString:@"pendingRuleRemoval"],
+             "rule removal should require an explicit pending confirmation state");
+    LRAssert([HTML containsString:@"confirm-remove"],
+             "rule removal should expose a separate confirmation action");
+    LRAssert([HTML containsString:@"Remove?"],
+             "the destructive confirmation should be clearly labeled");
 }
 
 static void TestEditorUsesTheHTMLSettingsSurface(void) {
