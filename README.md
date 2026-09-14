@@ -1,6 +1,6 @@
 # LinkRouter
 
-LinkRouter is a small native macOS menu-bar app that sends web links and local HTML files to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included native editor writes that file for you.
+LinkRouter is a small macOS menu-bar app that sends web links and local HTML files to Safari or to a specific Google Chrome profile. Its ordered rules live in a readable JSON file, and the included graphical settings editor writes that file for you.
 
 It follows the shape of the utility shown in [Thorsten Ball's LinkRouter post](https://x.com/thorstenball/status/2098327328845656224): first-match host rules, an explicit fallback, and Chrome profile routing.
 
@@ -42,10 +42,10 @@ Opening LinkRouter directly presents the rule editor. After closing that window,
 
 1. Click LinkRouter's branching-arrow icon in the menu bar.
 2. Choose **Configure Rules…**.
-3. Select the fallback browser.
-4. Add rules in priority order. Each rule has a name, one or more host patterns, a browser, and an optional Chrome profile directory.
+3. Select **Unmatched links** in the sidebar and choose the fallback browser.
+4. Add rules in priority order. Select a rule to edit its name, domains, exact/subdomain matching mode, browser, and optional Chrome profile directory.
 5. Enable **Private** when a Chrome target should open in an Incognito window.
-6. Use **Move Up** and **Move Down** when two rules can both match the same host.
+6. Use the arrow controls beside **Add rule** when two rules can both match the same host.
 7. Choose **Save**. New links use the saved rules immediately.
 
 An exact pattern such as `console.cloud.google.com` matches only that host. A leading wildcard such as `*.example.com` matches both `example.com` and any subdomain such as `docs.example.com`. Matching is case-insensitive. This first version intentionally matches hosts, not URL paths or query parameters.
@@ -92,7 +92,7 @@ Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profi
 ## Privacy and safety
 
 - All routing and configuration stay on the Mac.
-- LinkRouter has no network client, telemetry, analytics, or browsing-history log.
+- The settings UI loads only bundled local HTML, CSS, and JavaScript; LinkRouter has no telemetry, analytics, or browsing-history log.
 - Only `http`, `https`, and local `file` URLs are accepted.
 - Browser names, host patterns, and Chrome profile directories are validated.
 - Chrome is launched with a fixed executable and a typed argument array; config values never pass through a shell.

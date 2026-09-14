@@ -16,6 +16,7 @@
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) LRConfigWindowController *configWindowController;
+- (NSMenu *)buildMenu;
 - (void)requestDefaultApplicationAtURL:(NSURL *)applicationURL
                          forURLSchemes:(NSArray<NSString *> *)schemes
                                  index:(NSUInteger)index
@@ -72,7 +73,10 @@
     NSStatusBarButton *button = self.statusItem.button;
     button.image = [LRIconFactory menuBarIcon];
     button.toolTip = @"LinkRouter";
+    self.statusItem.menu = [self buildMenu];
+}
 
+- (NSMenu *)buildMenu {
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"LinkRouter"];
     self.statusMenuItem = [[NSMenuItem alloc] initWithTitle:@"Loading configuration…"
                                                     action:nil
@@ -101,7 +105,7 @@
                                            action:@selector(quit:)
                                     keyEquivalent:@"q"];
     quitItem.target = self;
-    self.statusItem.menu = menu;
+    return menu;
 }
 
 - (void)loadConfiguration {

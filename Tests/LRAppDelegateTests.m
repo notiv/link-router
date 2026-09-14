@@ -1,47 +1,67 @@
 #import <AppKit/AppKit.h>
+#import <WebKit/WebKit.h>
 
 #import "LRAppDelegate.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
 #import "LRRouting.h"
-#import "LRRuleTableController.h"
 #import "LRTestSupport.h"
 
 @interface LRAppDelegate (Testing)
-- (void)buildStatusMenu;
+- (NSMenu *)buildMenu;
 @end
 
 @interface LRConfigWindowController (Testing)
-- (void)defaultBrowserChanged:(id)sender;
-- (void)reload:(id)sender;
-- (void)save:(id)sender;
+- (void)saveConfigurationDictionary:(NSDictionary *)dictionary;
 @end
 
-@interface LRRuleTableController (Testing)
-- (void)domainModeChanged:(NSSegmentedControl *)sender;
-- (void)privateChanged:(NSButton *)sender;
-- (void)selectLocalFiles:(id)sender;
-@end
-
-static void TestStatusMenuActionsHaveExplicitTargets(void) {
-    (void)NSApplication.sharedApplication;
-    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
-    [delegate buildStatusMenu];
-    NSStatusItem *statusItem = [delegate valueForKey:@"statusItem"];
-
-    NSUInteger actionCount = 0;
-    for (NSMenuItem *item in statusItem.menu.itemArray) {
-        if (item.action == nil) {
-            continue;
-        }
-        actionCount += 1;
-        LRAssert(item.target == delegate, "every status-menu command should target the app delegate");
-    }
-    LRAssert(actionCount == 5, "the status menu should expose five commands");
-    [NSStatusBar.systemStatusBar removeStatusItem:statusItem];
+static void TestSettingsHTMLContainsTheReferenceComposition(void) {
+    NSString *HTML = [NSString stringWithContentsOfFile:@"Resources/Settings.html"
+                                               encoding:NSUTF8StringEncoding
+                                                  error:nil];
+    LRAssert([HTML containsString:@"class=\"sidebar\""],
+             "the settings UI should provide the reference-style sidebar");
+    LRAssert([HTML containsString:@"Unmatched links"],
+             "the settings UI should make unmatched links a first-class item");
+    LRAssert([HTML containsString:@"Local files"],
+             "the settings UI should explain local-file routing");
+    LRAssert([HTML containsString:@"Subdomains too"],
+             "the settings UI should expose the reference domain-mode control");
+    LRAssert([HTML containsString:@"Private window"],
+             "the settings UI should expose private Chrome windows");
+    LRAssert([HTML containsString:@"-webkit-appearance: none"],
+             "custom HTML controls should not inherit gray browser button chrome");
+    LRAssert([HTML containsString:@"class=\"traffic-lights\""],
+             "the title bar should use reference-aligned window controls");
+    LRAssert([HTML containsString:@"--control-height: 32px"],
+             "editor controls should share a readable 32-pixel height");
+    LRAssert([HTML containsString:@".text-input:focus-visible { outline: 0; }"],
+             "text fields should rely on the shell focus ring instead of drawing a second outline");
 }
 
-static void TestEditorSaveReloadFlow(void) {
+static void TestEditorUsesTheHTMLSettingsSurface(void) {
+    NSURL *configURL = [NSURL fileURLWithPath:[NSTemporaryDirectory()
+        stringByAppendingPathComponent:@"LinkRouter-Web-Surface.json"]];
+    LRConfigStore *store = [[LRConfigStore alloc] initWithConfigURL:configURL];
+    LRConfigWindowController *controller = [[LRConfigWindowController alloc]
+        initWithConfigStore:store configurationSaved:^(LRRouterConfiguration *configuration) {
+            (void)configuration;
+        }];
+    WKWebView *webView = [controller valueForKey:@"webView"];
+
+    LRAssert([webView isKindOfClass:WKWebView.class],
+             "the editor should render the reference design as HTML and CSS");
+    LRAssert((controller.window.styleMask & NSWindowStyleMaskFullSizeContentView) != 0,
+             "the HTML settings surface should extend through the reference-style title bar");
+    LRAssert([controller.window standardWindowButton:NSWindowCloseButton].hidden,
+             "native traffic lights should be hidden behind the reference-aligned HTML controls");
+    LRAssert([controller valueForKey:@"titlebarDragView"] != nil,
+             "the HTML title bar should have a native window-drag region");
+    LRAssert([[webView accessibilityLabel] isEqualToString:@"LinkRouter settings"],
+             "the settings surface should have a useful accessibility label");
+}
+
+static void TestHTMLSettingsSaveValidatedConfiguration(void) {
     NSURL *directory = [[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES]
         URLByAppendingPathComponent:[@"LinkRouterEditorTests-"
                                         stringByAppendingString:NSUUID.UUID.UUIDString]
@@ -57,107 +77,53 @@ static void TestEditorSaveReloadFlow(void) {
          configurationSaved:^(LRRouterConfiguration *configuration) {
              savedConfiguration = configuration;
          }];
-    [controller reload:nil];
-    LRRuleTableController *ruleTable = [controller valueForKey:@"ruleTableController"];
-    [ruleTable setDefaultTarget:[LRBrowserTarget
-        targetWithApplication:LRBrowserApplicationChrome
-                       profile:@"Profile 2"
-               privateBrowsing:YES]];
-    LRRoutingRule *rule = [LRRoutingRule
-        ruleWithName:@"Work"
-               hosts:@[@"*.example.com"]
-              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]];
-    [ruleTable setRoutingRules:@[rule]];
-    [controller save:nil];
+    NSDictionary *document = @{
+        @"default": @{
+            @"app": @"Google Chrome",
+            @"profile": @"Profile 2",
+            @"private": @YES,
+        },
+        @"rules": @[
+            @{
+                @"name": @"Work",
+                @"hosts": @[@"*.example.com"],
+                @"app": @"Safari",
+            },
+        ],
+    };
+    [controller saveConfigurationDictionary:document];
 
     LRRouterConfiguration *reloaded = [store loadConfiguration:&error];
-    LRAssert(savedConfiguration != nil, "a successful editor save should update live app state");
+    LRAssert(savedConfiguration != nil, "saving from HTML should update live app state");
     LRAssert(reloaded.defaultTarget.application == LRBrowserApplicationChrome,
-             "the editor should save its selected fallback browser");
+             "the HTML editor should save its fallback browser");
     LRAssert([reloaded.defaultTarget.profile isEqualToString:@"Profile 2"],
-             "the editor should save the fallback Chrome profile");
+             "the HTML editor should save the Chrome profile");
     LRAssert(reloaded.defaultTarget.privateBrowsing,
-             "the editor should save the fallback private-browsing option");
-    LRAssert([reloaded.rules.firstObject.name isEqualToString:@"Work"],
-             "the editor should save and reload ordered routing rules");
+             "the HTML editor should save private browsing");
+    LRAssert([reloaded.rules.firstObject.hosts.firstObject isEqualToString:@"*.example.com"],
+             "the HTML editor should preserve subdomain matching");
     [NSFileManager.defaultManager removeItemAtURL:directory error:nil];
 }
 
-static void TestRuleTablePrivateControlUpdatesChromeTarget(void) {
-    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
-    (void)controller.view;
-    LRRoutingRule *rule = [LRRoutingRule
-        ruleWithName:@"Work"
-               hosts:@[@"example.com"]
-              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome profile:nil]];
-    [controller setRoutingRules:@[rule]];
+static void TestStatusMenuActionsHaveExplicitTargets(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    NSMenu *menu = [delegate buildMenu];
 
-    NSButton *privateButton = [controller valueForKey:@"privateButton"];
-    LRAssert(privateButton != nil && privateButton.enabled,
-             "a Chrome rule should expose an enabled private control");
-    privateButton.state = NSControlStateValueOn;
-    [controller privateChanged:privateButton];
-
-    LRAssert(controller.routingRules.firstObject.target.privateBrowsing,
-             "the private control should update the Chrome target");
-}
-
-static void TestRulesEditorPresentsWildcardHostsAsDomainModes(void) {
-    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
-    (void)controller.view;
-    LRRoutingRule *rule = [LRRoutingRule
-        ruleWithName:@"Work"
-               hosts:@[@"*.example.com"]
-              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome profile:nil]];
-    [controller setRoutingRules:@[rule]];
-
-    NSArray<NSTextField *> *domainFields = [controller valueForKey:@"domainFields"];
-    NSArray<NSSegmentedControl *> *modeControls = [controller valueForKey:@"domainModeControls"];
-    LRAssert([domainFields.firstObject.stringValue isEqualToString:@"example.com"],
-             "the domain field should omit the wildcard prefix");
-    LRAssert(modeControls.firstObject.selectedSegment == 1,
-             "a wildcard host should select the subdomains matching mode");
-
-    modeControls.firstObject.selectedSegment = 0;
-    [controller domainModeChanged:modeControls.firstObject];
-    LRAssert([controller.routingRules.firstObject.hosts.firstObject isEqualToString:@"example.com"],
-             "switching to exact matching should remove the wildcard prefix");
-}
-
-static void TestRulesEditorUsesAReferenceStyleSidebar(void) {
-    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
-    (void)controller.view;
-    NSTableView *tableView = [controller valueForKey:@"tableView"];
-
-    LRAssert(tableView.headerView == nil,
-             "the redesigned rules editor should use a headerless sidebar list");
-    LRAssert(tableView.tableColumns.count == 1,
-             "the sidebar should present each route as one scannable item");
-    NSButton *fallbackButton = [controller valueForKey:@"fallbackButton"];
-    NSButton *localFilesButton = [controller valueForKey:@"localFilesButton"];
-    LRAssert([fallbackButton.title containsString:@"Unmatched links"],
-             "the sidebar should expose fallback routing as Unmatched links");
-    LRAssert([localFilesButton.title containsString:@"Local files"],
-             "the sidebar should expose local-file routing explicitly");
-}
-
-static void TestLocalFilesExplainThatTheyFollowTheFallback(void) {
-    LRRuleTableController *controller = [[LRRuleTableController alloc] init];
-    (void)controller.view;
-    [controller selectLocalFiles:nil];
-    NSTextField *detailDescription = [controller valueForKey:@"detailDescriptionLabel"];
-
-    LRAssert([detailDescription.stringValue containsString:@"Unmatched links"],
-             "the local-files detail should explain the inherited fallback behavior");
+    NSUInteger actionCount = 0;
+    for (NSMenuItem *item in menu.itemArray) {
+        if (item.action == nil) { continue; }
+        actionCount += 1;
+        LRAssert(item.target == delegate, "every status-menu command should target the app delegate");
+    }
+    LRAssert(actionCount == 5, "the status menu should expose five commands");
 }
 
 int main(void) {
     @autoreleasepool {
-        TestRulesEditorUsesAReferenceStyleSidebar();
-        TestLocalFilesExplainThatTheyFollowTheFallback();
-        TestEditorSaveReloadFlow();
-        TestRuleTablePrivateControlUpdatesChromeTarget();
-        TestRulesEditorPresentsWildcardHostsAsDomainModes();
+        TestSettingsHTMLContainsTheReferenceComposition();
+        TestEditorUsesTheHTMLSettingsSurface();
+        TestHTMLSettingsSaveValidatedConfiguration();
         TestStatusMenuActionsHaveExplicitTargets();
         return LRFinishTests();
     }
