@@ -72,7 +72,7 @@ The editor reads and writes:
 ~/Library/Application Support/LinkRouter/config.json
 ```
 
-You can also choose **Open Config File…**, edit JSON directly, and then choose **Reload Config**. The format is demonstrated in [Examples/config.json](Examples/config.json):
+You can also use **Open JSON** in the settings window, edit the file directly, and then choose **Reload** in that same window. The format is demonstrated in [Examples/config.json](Examples/config.json):
 
 ```json
 {
@@ -94,7 +94,7 @@ Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profi
 ## Privacy and safety
 
 - All routing and configuration stay on the Mac.
-- The settings UI loads only bundled local HTML, CSS, and JavaScript; LinkRouter has no telemetry, analytics, or browsing-history log.
+- The settings UI is built entirely with native AppKit controls; LinkRouter has no embedded web content, telemetry, analytics, or browsing-history log.
 - Only `http`, `https`, and local `file` URLs are accepted.
 - Browser names, host patterns, and Chrome profile directories are validated.
 - Chrome is launched with a fixed executable and a typed argument array; config values never pass through a shell.
@@ -127,5 +127,8 @@ The implementation follows Apple's documented APIs and bundle keys:
 - [`CFBundleIconFile`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleiconfile) identifies the icon in the app bundle's resources.
 - [`LSUIElement`](https://developer.apple.com/documentation/bundleresources/information-property-list/lsuielement) keeps this agent app out of the Dock.
 - [`SMAppService.mainAppService`](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp?language=objc) registers the main app to launch at login and exposes its current approval state.
+- [`NSSplitViewController`](https://developer.apple.com/documentation/appkit/nssplitviewcontroller) provides the native sidebar and continuously resizable rule editor.
+- [`NSGlassEffectView`](https://developer.apple.com/documentation/appkit/nsglasseffectview) provides the Liquid Glass action surface on macOS 26 and newer.
+- [`NSVisualEffectView`](https://developer.apple.com/documentation/appkit/nsvisualeffectview) provides a semantic native-material fallback on macOS 13 through 15.
 - [Launch Apple Event constants](https://developer.apple.com/documentation/coreservices/apple_events/1556410-launch_apple_event_constants) identify login-item launches so the editor can remain closed.
 - [Chromium's `kIncognito` switch](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/chrome/common/chrome_switches.cc) launches Chrome directly in Incognito mode.

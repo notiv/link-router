@@ -1,11 +1,10 @@
 #import <AppKit/AppKit.h>
-#import <WebKit/WebKit.h>
-
 #import "LRAppDelegate.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
 #import "LRLoginItemController.h"
 #import "LRRouting.h"
+#import "LRRulesEditorViewController.h"
 #import "LRTestSupport.h"
 
 @interface LRAppDelegate (Testing)
@@ -15,7 +14,15 @@
 @end
 
 @interface LRConfigWindowController (Testing)
-- (void)saveConfigurationDictionary:(NSDictionary *)dictionary;
+- (void)saveConfiguration:(LRRouterConfiguration *)configuration;
+@end
+
+@interface LRRulesEditorViewController (Testing)
+- (void)domainModeChanged:(NSSegmentedControl *)sender;
+- (void)moveRuleAtIndex:(NSUInteger)sourceIndex toChildIndex:(NSUInteger)childIndex;
+- (void)selectItem:(id)item;
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldShowOutlineCellForItem:(id)item;
+- (NSTableRowView *)outlineView:(NSOutlineView *)outlineView rowViewForItem:(id)item;
 @end
 
 @interface LRRecordingLoginItemController : NSObject <LRLoginItemControlling>
@@ -47,61 +54,76 @@
 
 @end
 
-static void TestSettingsHTMLContainsTheReferenceComposition(void) {
-    NSString *HTML = [NSString stringWithContentsOfFile:@"Resources/Settings.html"
-                                               encoding:NSUTF8StringEncoding
-                                                  error:nil];
-    LRAssert([HTML containsString:@"class=\"sidebar\""],
-             "the settings UI should provide the reference-style sidebar");
-    LRAssert([HTML containsString:@"Unmatched links"],
-             "the settings UI should make unmatched links a first-class item");
-    LRAssert([HTML containsString:@"Local files"],
-             "the settings UI should explain local-file routing");
-    LRAssert([HTML containsString:@"Subdomains too"],
-             "the settings UI should expose the reference domain-mode control");
-    LRAssert([HTML containsString:@"Private window"],
-             "the settings UI should expose private Chrome windows");
-    LRAssert([HTML containsString:@"-webkit-appearance: none"],
-             "custom HTML controls should not inherit gray browser button chrome");
-    LRAssert([HTML containsString:@"class=\"traffic-lights\""],
-             "the title bar should use reference-aligned window controls");
-    LRAssert([HTML containsString:@"--control-height: 32px"],
-             "editor controls should share a readable 32-pixel height");
-    LRAssert([HTML containsString:@"overflow: auto; padding: 12px 8px 4px;"],
-             "the first sidebar rule should sit twelve pixels below the title bar");
-    LRAssert([HTML containsString:@".text-input:focus-visible { outline: 0; }"],
-             "text fields should rely on the shell focus ring instead of drawing a second outline");
-    LRAssert([HTML containsString:@"pendingRuleRemoval"],
-             "rule removal should require an explicit pending confirmation state");
-    LRAssert([HTML containsString:@"confirm-remove"],
-             "rule removal should expose a separate confirmation action");
-    LRAssert([HTML containsString:@"Remove?"],
-             "the destructive confirmation should be clearly labeled");
+static NSView *FindDescendantOfClass(NSView *view, Class viewClass) {
+    if ([view isKindOfClass:viewClass]) { return view; }
+    for (NSView *subview in view.subviews) {
+        NSView *match = FindDescendantOfClass(subview, viewClass);
+        if (match != nil) { return match; }
+    }
+    return nil;
 }
 
-static void TestEditorUsesTheHTMLSettingsSurface(void) {
+static NSButton *FindButtonWithAccessibilityLabel(NSView *view, NSString *label) {
+    if ([view isKindOfClass:NSButton.class] &&
+        [[view accessibilityLabel] isEqualToString:label]) {
+        return (NSButton *)view;
+    }
+    for (NSView *subview in view.subviews) {
+        NSButton *match = FindButtonWithAccessibilityLabel(subview, label);
+        if (match != nil) { return match; }
+    }
+    return nil;
+}
+
+static NSTextField *FindLabelWithText(NSView *view, NSString *text) {
+    if ([view isKindOfClass:NSTextField.class] &&
+        [((NSTextField *)view).stringValue isEqualToString:text]) {
+        return (NSTextField *)view;
+    }
+    for (NSView *subview in view.subviews) {
+        NSTextField *match = FindLabelWithText(subview, text);
+        if (match != nil) { return match; }
+    }
+    return nil;
+}
+
+static void TestEditorUsesNativeLiquidGlassControls(void) {
     NSURL *configURL = [NSURL fileURLWithPath:[NSTemporaryDirectory()
-        stringByAppendingPathComponent:@"LinkRouter-Web-Surface.json"]];
+        stringByAppendingPathComponent:@"LinkRouter-Native-Surface.json"]];
     LRConfigStore *store = [[LRConfigStore alloc] initWithConfigURL:configURL];
     LRConfigWindowController *controller = [[LRConfigWindowController alloc]
         initWithConfigStore:store configurationSaved:^(LRRouterConfiguration *configuration) {
             (void)configuration;
         }];
-    WKWebView *webView = [controller valueForKey:@"webView"];
 
-    LRAssert([webView isKindOfClass:WKWebView.class],
-             "the editor should render the reference design as HTML and CSS");
-    LRAssert((controller.window.styleMask & NSWindowStyleMaskFullSizeContentView) != 0,
-             "the HTML settings surface should extend through the reference-style title bar");
-    LRAssert([controller.window standardWindowButton:NSWindowCloseButton].hidden,
-             "native traffic lights should be hidden behind the reference-aligned HTML controls");
-    LRAssert([controller valueForKey:@"titlebarDragView"] != nil,
-             "the HTML title bar should have a native window-drag region");
-    LRAssert([[webView accessibilityLabel] isEqualToString:@"LinkRouter settings"],
-             "the settings surface should have a useful accessibility label");
+    NSView *contentView = controller.window.contentView;
+    NSVisualEffectView *sidebarMaterial = (NSVisualEffectView *)FindDescendantOfClass(
+        contentView, NSVisualEffectView.class);
+    LRAssert(FindDescendantOfClass(contentView, NSOutlineView.class) != nil,
+             "the editor should navigate rules with a native source-list outline view");
+    LRAssert(FindDescendantOfClass(contentView, NSSegmentedControl.class) != nil,
+             "the editor should use native browser selection controls");
+    LRAssert(![controller.window standardWindowButton:NSWindowCloseButton].hidden,
+             "the editor should use the native macOS window controls");
+    LRAssert(sidebarMaterial.material == NSVisualEffectMaterialSidebar &&
+                 sidebarMaterial.blendingMode == NSVisualEffectBlendingModeWithinWindow,
+             "the sidebar should use an adaptive Finder-style semantic material");
+    controller.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    NSString *appearanceName = [sidebarMaterial.effectiveAppearance
+        bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
+    LRAssert([appearanceName isEqualToString:NSAppearanceNameDarkAqua],
+             "the native editor should follow the user's dark appearance");
+    if (@available(macOS 26.0, *)) {
+        Class glassClass = NSClassFromString(@"NSGlassEffectView");
+        LRAssert(glassClass != Nil && FindDescendantOfClass(contentView, glassClass) != nil,
+                 "the action surface should use the system Liquid Glass effect");
+    } else {
+        LRAssert(FindDescendantOfClass(contentView, NSVisualEffectView.class) != nil,
+                 "older macOS releases should receive a native material fallback");
+    }
 }
 
-static void TestHTMLSettingsSaveValidatedConfiguration(void) {
+static void TestNativeSettingsSaveValidatedConfiguration(void) {
     NSURL *directory = [[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES]
         URLByAppendingPathComponent:[@"LinkRouterEditorTests-"
                                         stringByAppendingString:NSUUID.UUID.UUIDString]
@@ -117,33 +139,142 @@ static void TestHTMLSettingsSaveValidatedConfiguration(void) {
          configurationSaved:^(LRRouterConfiguration *configuration) {
              savedConfiguration = configuration;
          }];
-    NSDictionary *document = @{
-        @"default": @{
-            @"app": @"Google Chrome",
-            @"profile": @"Profile 2",
-            @"private": @YES,
-        },
-        @"rules": @[
-            @{
-                @"name": @"Work",
-                @"hosts": @[@"*.example.com"],
-                @"app": @"Safari",
-            },
-        ],
-    };
-    [controller saveConfigurationDictionary:document];
+    LRBrowserTarget *fallback = [LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome
+                                                               profile:@"Profile 2"
+                                                       privateBrowsing:YES];
+    LRRoutingRule *rule = [LRRoutingRule
+        ruleWithName:@"Work"
+               hosts:@[@"*.example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]];
+    LRRouterConfiguration *document = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:fallback
+                         rules:@[rule]];
+    [controller saveConfiguration:document];
 
     LRRouterConfiguration *reloaded = [store loadConfiguration:&error];
-    LRAssert(savedConfiguration != nil, "saving from HTML should update live app state");
+    LRAssert(savedConfiguration != nil, "saving from the native editor should update live app state");
     LRAssert(reloaded.defaultTarget.application == LRBrowserApplicationChrome,
-             "the HTML editor should save its fallback browser");
+             "the native editor should save its fallback browser");
     LRAssert([reloaded.defaultTarget.profile isEqualToString:@"Profile 2"],
-             "the HTML editor should save the Chrome profile");
+             "the native editor should save the Chrome profile");
     LRAssert(reloaded.defaultTarget.privateBrowsing,
-             "the HTML editor should save private browsing");
+             "the native editor should save private browsing");
     LRAssert([reloaded.rules.firstObject.hosts.firstObject isEqualToString:@"*.example.com"],
-             "the HTML editor should preserve subdomain matching");
+             "the native editor should preserve subdomain matching");
     [NSFileManager.defaultManager removeItemAtURL:directory error:nil];
+}
+
+static void TestSidebarUsesInlineRuleManagement(void) {
+    LRRoutingRule *rule = [LRRoutingRule
+        ruleWithName:@"Work"
+               hosts:@[@"example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]];
+    LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                                              profile:nil]
+                         rules:@[rule]];
+    LRRulesEditorViewController *editor = [[LRRulesEditorViewController alloc]
+        initWithConfiguration:configuration configurationChanged:^{}];
+    editor.view.frame = NSMakeRect(0.0, 0.0, 820.0, 520.0);
+    [editor.view layoutSubtreeIfNeeded];
+    NSOutlineView *rules = [editor valueForKey:@"sidebarOutlineView"];
+    [rules rowViewAtRow:1 makeIfNecessary:YES];
+
+    LRAssert(FindButtonWithAccessibilityLabel(editor.view, @"Move selected rule up") == nil,
+             "rule ordering should use drag and drop instead of a permanent up button");
+    LRAssert(FindButtonWithAccessibilityLabel(editor.view, @"Move selected rule down") == nil,
+             "rule ordering should use drag and drop instead of a permanent down button");
+    LRAssert(FindButtonWithAccessibilityLabel(editor.view, @"Remove selected rule") == nil,
+             "rule removal should appear inline on hover instead of in a permanent toolbar");
+    LRAssert(FindButtonWithAccessibilityLabel(editor.view, @"Add rule") != nil,
+             "the Rules heading should expose a compact inline add button");
+    NSTableRowView *deleteRow = [editor outlineView:rules rowViewForItem:rule];
+    deleteRow.frame = NSMakeRect(0.0, 0.0, 300.0, 24.0);
+    [deleteRow layoutSubtreeIfNeeded];
+    NSButton *deleteButton = FindButtonWithAccessibilityLabel(deleteRow, @"Delete rule");
+    LRAssert(deleteButton != nil, "rule rows should own an inline Delete affordance");
+    if (deleteButton != nil) {
+        deleteButton.hidden = NO;
+        [deleteRow layoutSubtreeIfNeeded];
+        NSPoint deleteCenter = NSMakePoint(NSMidX(deleteButton.frame), NSMidY(deleteButton.frame));
+        LRAssert([deleteRow hitTest:deleteCenter] == deleteButton,
+                 "the inline Delete affordance should receive clicks above the outline cell");
+        LRAssert(deleteButton.target == editor &&
+                     deleteButton.action == NSSelectorFromString(@"removeRuleFromSidebar:"),
+                 "the inline Delete affordance should be wired to rule removal");
+    }
+
+    LRAssert([rules.registeredDraggedTypes containsObject:@"com.linkrouter.rule-row"],
+             "rule rows should register for native drag-and-drop reordering");
+    NSOutlineView *otherRoutes = [editor valueForKey:@"specialRoutesOutlineView"];
+    LRAssert(rules.indentationPerLevel == 0.0 && otherRoutes.indentationPerLevel == 0.0,
+             "rule names and special routes should share one consistent text inset");
+    LRAssert(![editor outlineView:rules shouldShowOutlineCellForItem:@"Rules"],
+             "the fixed Rules group should not show a disclosure arrow on hover");
+
+    NSStackView *detailStack = [editor valueForKey:@"detailStack"];
+    CGFloat ruleTitleX = [detailStack convertPoint:NSZeroPoint toView:editor.view].x;
+    [editor selectItem:@"Unmatched links"];
+    [editor.view layoutSubtreeIfNeeded];
+    CGFloat fallbackTitleX = [detailStack convertPoint:NSZeroPoint toView:editor.view].x;
+    LRAssert(ABS(ruleTitleX - fallbackTitleX) < 0.5,
+             "large detail titles should remain on one stable alignment guide");
+
+    LRRoutingRule *secondRule = [LRRoutingRule
+        ruleWithName:@"Personal"
+               hosts:@[@"personal.example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]];
+    LRRouterConfiguration *twoRules = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:configuration.defaultTarget
+                         rules:@[rule, secondRule]];
+    [editor setConfiguration:twoRules];
+    [editor moveRuleAtIndex:0 toChildIndex:2];
+    LRAssert([editor.currentConfiguration.rules.firstObject.name isEqualToString:@"Personal"],
+             "dropping a rule after another rule should persist the reordered rule list");
+}
+
+static void TestFallbackBrowserControlUsesOneRow(void) {
+    LRRulesEditorViewController *editor = [[LRRulesEditorViewController alloc]
+        initWithConfiguration:LRRouterConfiguration.defaultConfiguration
+         configurationChanged:^{}];
+    [editor selectItem:@"Unmatched links"];
+
+    NSTextField *openIn = FindLabelWithText(editor.view, @"Open in");
+    NSSegmentedControl *browser = (NSSegmentedControl *)FindDescendantOfClass(
+        editor.view, NSSegmentedControl.class);
+    LRAssert(openIn != nil && browser != nil && openIn.superview == browser.superview,
+             "Unmatched links should place Open in and the browser picker on one row");
+}
+
+static void TestSubdomainModeDisplaysTheWildcardPrefix(void) {
+    LRRoutingRule *rule = [LRRoutingRule
+        ruleWithName:@"Work"
+               hosts:@[@"example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]];
+    LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                                              profile:nil]
+                         rules:@[rule]];
+    LRRulesEditorViewController *editor = [[LRRulesEditorViewController alloc]
+        initWithConfiguration:configuration configurationChanged:^{}];
+    NSSegmentedControl *mode = [NSSegmentedControl
+        segmentedControlWithLabels:@[@"Exact", @"Subdomains"]
+                      trackingMode:NSSegmentSwitchTrackingSelectOne
+                            target:nil
+                            action:nil];
+    mode.tag = 0;
+    mode.selectedSegment = 1;
+
+    [editor domainModeChanged:mode];
+    LRAssert([editor.currentConfiguration.rules.firstObject.hosts.firstObject
+                 isEqualToString:@"*.example.com"],
+             "subdomain mode should add the visible wildcard prefix to the domain pattern");
+
+    mode.selectedSegment = 0;
+    [editor domainModeChanged:mode];
+    LRAssert([editor.currentConfiguration.rules.firstObject.hosts.firstObject
+                 isEqualToString:@"example.com"],
+             "exact mode should remove the wildcard prefix from the domain pattern");
 }
 
 static void TestStatusMenuActionsHaveExplicitTargets(void) {
@@ -227,9 +358,11 @@ static void TestStartAtLoginFailureIsVisible(void) {
 
 int main(void) {
     @autoreleasepool {
-        TestSettingsHTMLContainsTheReferenceComposition();
-        TestEditorUsesTheHTMLSettingsSurface();
-        TestHTMLSettingsSaveValidatedConfiguration();
+        TestEditorUsesNativeLiquidGlassControls();
+        TestNativeSettingsSaveValidatedConfiguration();
+        TestSidebarUsesInlineRuleManagement();
+        TestFallbackBrowserControlUsesOneRow();
+        TestSubdomainModeDisplaysTheWildcardPrefix();
         TestStatusMenuActionsHaveExplicitTargets();
         TestStartAtLoginMenuReflectsAndChangesSystemState();
         TestStartAtLoginApprovalOpensSystemSettings();
