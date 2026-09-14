@@ -18,7 +18,7 @@ Build the installer, open it, and drag LinkRouter to **Applications**:
 
 ```sh
 make installer
-open dist/LinkRouter-0.1.1.dmg
+open dist/LinkRouter-0.2.0.dmg
 ```
 
 The disk image contains `LinkRouter.app` and an **Applications** shortcut. The app uses the same original routing-fork mark in the menu bar and in its high-resolution Finder icon.
@@ -45,9 +45,9 @@ To have LinkRouter available automatically, open its menu and enable **Start at 
 1. Click LinkRouter's branching-arrow icon in the menu bar.
 2. Choose **Configure Rules…**.
 3. Select **Unmatched links** in the sidebar and choose the fallback browser.
-4. Add rules in priority order. Select a rule to edit its name, domains, exact/subdomain matching mode, browser, and optional Chrome profile directory.
-5. Enable **Private** when a Chrome target should open in an Incognito window.
-6. Use the arrow controls beside **Add rule** when two rules can both match the same host.
+4. Use **+** beside **Rules** to add a rule, then edit its name, domains, exact/subdomain matching mode, browser, and optional Chrome profile.
+5. Drag rule rows into priority order. Hover a rule to reveal its delete action.
+6. Enable **Open in a private window** when a Chrome target should open in an Incognito window.
 7. Choose **Save**. New links use the saved rules immediately.
 
 An exact pattern such as `console.cloud.google.com` matches only that host. A leading wildcard such as `*.example.com` matches both `example.com` and any subdomain such as `docs.example.com`. Matching is case-insensitive. This first version intentionally matches hosts, not URL paths or query parameters.
@@ -107,7 +107,7 @@ Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profi
 make test           # compile and run all automated tests
 make build          # compile the native executable
 make app            # assemble and ad-hoc-sign dist/LinkRouter.app
-make installer      # create dist/LinkRouter-0.1.0.dmg
+make installer      # create dist/LinkRouter-0.2.0.dmg
 make verify-bundle  # validate URL schemes, agent-app setting, and signature
 make verify-installer # build, mount, and inspect the installer
 make run            # build and launch the app
