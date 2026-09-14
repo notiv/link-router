@@ -10,6 +10,8 @@
     <string>LinkRouter</string>
     <key>CFBundleIdentifier</key>
     <string>com.linkrouter.LinkRouter</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>

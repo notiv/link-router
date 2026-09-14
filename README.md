@@ -12,14 +12,27 @@ It follows the shape of the utility shown in [Thorsten Ball's LinkRouter post](h
 
 LinkRouter has no third-party dependencies and does not require the full Xcode app.
 
-## Build and run
+## Install
+
+Build the installer, open it, and drag LinkRouter to **Applications**:
+
+```sh
+make installer
+open dist/LinkRouter-0.1.0.dmg
+```
+
+The disk image contains `LinkRouter.app` and an **Applications** shortcut. The app uses the same original routing-fork mark in the menu bar and in its high-resolution Finder icon.
+
+The local build is ad-hoc signed and intended for this Mac. Distribution to other Macs requires signing with a Developer ID certificate and notarization.
+
+## Build and run from the repository
 
 ```sh
 make verify
 open dist/LinkRouter.app
 ```
 
-`make verify` runs the automated tests, builds a native app bundle at `dist/LinkRouter.app`, validates its property list, and verifies its ad-hoc signature.
+`make verify` runs the automated tests, builds a native app bundle at `dist/LinkRouter.app`, validates its property list and icon, and verifies its ad-hoc signature. `make verify-installer` additionally builds, mounts, and inspects the disk image.
 
 To keep the app somewhere permanent, quit it and copy `dist/LinkRouter.app` to `/Applications` before opening it again. Moving it after selecting it as the default browser may make macOS point at the old location.
 
@@ -86,7 +99,9 @@ Supported `app` values are exactly `Safari` and `Google Chrome`. A Chrome `profi
 make test           # compile and run all automated tests
 make build          # compile the native executable
 make app            # assemble and ad-hoc-sign dist/LinkRouter.app
+make installer      # create dist/LinkRouter-0.1.0.dmg
 make verify-bundle  # validate URL schemes, agent-app setting, and signature
+make verify-installer # build, mount, and inspect the installer
 make run            # build and launch the app
 make clean          # remove only local build outputs
 ```
@@ -99,4 +114,5 @@ The implementation follows Apple's documented APIs and bundle keys:
 - [`NSWorkspace.open(_:withApplicationAt:configuration:completionHandler:)`](https://developer.apple.com/documentation/appkit/nsworkspace/open(_:withapplicationat:configuration:completionhandler:)) opens a URL in an explicitly selected app.
 - [`NSWorkspace.setDefaultApplication(at:toOpenURLsWithScheme:completion:)`](https://developer.apple.com/documentation/appkit/nsworkspace/setdefaultapplication(at:toopenurlswithscheme:completion:)) requests the default handler and allows macOS to obtain consent.
 - [`CFBundleURLTypes`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleurltypes) declares `http` and `https` support.
+- [`CFBundleIconFile`](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleiconfile) identifies the icon in the app bundle's resources.
 - [`LSUIElement`](https://developer.apple.com/documentation/bundleresources/information-property-list/lsuielement) keeps this agent app out of the Dock.
