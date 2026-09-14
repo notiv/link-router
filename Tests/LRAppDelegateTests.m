@@ -18,8 +18,10 @@
 @end
 
 @interface LRRulesEditorViewController (Testing)
+- (void)addRule:(id)sender;
 - (void)domainModeChanged:(NSSegmentedControl *)sender;
 - (void)moveRuleAtIndex:(NSUInteger)sourceIndex toChildIndex:(NSUInteger)childIndex;
+- (void)removeRule:(id)sender;
 - (void)selectItem:(id)item;
 - (BOOL)outlineView:(NSOutlineView *)outlineView shouldShowOutlineCellForItem:(id)item;
 @end
@@ -214,11 +216,25 @@ static void TestSidebarUsesInlineRuleManagement(void) {
         NSButton *expandedButton = [deleteButton valueForKey:@"expandedButton"];
         LRAssert(!deleteButton.hidden,
                  "the selected rule should clearly expose its remove control");
+        LRAssert(deleteButton.title.length == 0 && !deleteButton.bordered,
+                 "the click target itself should not draw over the animated visuals");
+        [rules layoutSubtreeIfNeeded];
+        NSView *hitContainer = rules.superview;
+        NSPoint minusCenter = [collapsedButton convertPoint:
+            NSMakePoint(NSMidX(collapsedButton.bounds), NSMidY(collapsedButton.bounds))
+                                                     toView:hitContainer];
+        LRAssert([rules hitTest:minusCenter] == deleteButton,
+                 "clicking the collapsed minus should reach the delete control without waiting");
         NSPoint deleteCenter = [deleteButton convertPoint:
             NSMakePoint(NSMidX(deleteButton.bounds), NSMidY(deleteButton.bounds))
-                                                  toView:ruleCell];
-        LRAssert([ruleCell hitTest:deleteCenter] == deleteButton,
-                 "the inline Delete affordance should receive clicks in the native cell");
+                                                  toView:hitContainer];
+        LRAssert([rules hitTest:deleteCenter] == deleteButton,
+                 "the whole slot should stay one click target while Delete animates");
+        NSPoint besideSlot = [deleteButton convertPoint:
+            NSMakePoint(NSMinX(deleteButton.bounds) - 8.0, NSMidY(deleteButton.bounds))
+                                                 toView:hitContainer];
+        LRAssert([rules hitTest:besideSlot] != deleteButton,
+                 "clicking the rule name beside the slot must not trigger deletion");
         LRAssert(deleteButton.target == editor &&
                      deleteButton.action == NSSelectorFromString(@"removeRuleFromSidebar:"),
                  "the inline Delete affordance should be wired to rule removal");
@@ -331,6 +347,106 @@ static void TestFallbackBrowserControlUsesOneRow(void) {
         editor.view, NSSegmentedControl.class);
     LRAssert(openIn != nil && browser != nil && openIn.superview == browser.superview,
              "Unmatched links should place Open in and the browser picker on one row");
+}
+
+static NSTextField *FindTextFieldWithAccessibilityLabel(NSView *root, NSString *label) {
+    if ([root isKindOfClass:NSTextField.class] && [[root accessibilityLabel] isEqualToString:label]) {
+        return (NSTextField *)root;
+    }
+    for (NSView *subview in root.subviews) {
+        NSTextField *match = FindTextFieldWithAccessibilityLabel(subview, label);
+        if (match != nil) { return match; }
+    }
+    return nil;
+}
+
+static CGFloat CapTopFromTopOfView(NSTextField *field, NSView *root) {
+    NSRect frame = [field convertRect:field.bounds toView:root];
+    CGFloat frameTop = NSHeight(root.bounds) - NSMaxY(frame);
+    return frameTop + field.firstBaselineOffsetFromTop - field.font.capHeight;
+}
+
+static void TestDetailTitleStartsLevelWithRulesHeader(void) {
+    LRRoutingRule *rule = [LRRoutingRule
+        ruleWithName:@"Work"
+               hosts:@[@"example.com"]
+              target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]];
+    LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari
+                                                              profile:nil]
+                         rules:@[rule]];
+    LRRulesEditorViewController *editor = [[LRRulesEditorViewController alloc]
+        initWithConfiguration:configuration configurationChanged:^{}];
+    editor.view.frame = NSMakeRect(0.0, 0.0, 820.0, 520.0);
+    [editor.view layoutSubtreeIfNeeded];
+    NSOutlineView *rules = [editor valueForKey:@"sidebarOutlineView"];
+    NSTableCellView *groupCell = [rules viewAtColumn:0 row:0 makeIfNecessary:YES];
+    [editor.view layoutSubtreeIfNeeded];
+    NSTextField *title = FindTextFieldWithAccessibilityLabel(editor.view, @"Rule name");
+    LRAssert(groupCell.textField != nil && title != nil,
+             "the Rules header and the rule title should both be present");
+    if (groupCell.textField == nil || title == nil) { return; }
+    CGFloat delta = CapTopFromTopOfView(title, editor.view)
+        - CapTopFromTopOfView(groupCell.textField, editor.view);
+    LRAssert(ABS(delta) < 1.0,
+             "the rule title's letters should start level with the Rules header in the sidebar");
+}
+
+static void TestUntouchedNewRuleDeletesWithoutConfirmation(void) {
+    LRRulesEditorViewController *editor = [[LRRulesEditorViewController alloc]
+        initWithConfiguration:LRRouterConfiguration.defaultConfiguration
+         configurationChanged:^{}];
+    NSUInteger originalRuleCount = editor.currentConfiguration.rules.count;
+
+    [editor addRule:nil];
+    LRAssert(editor.currentConfiguration.rules.count == originalRuleCount + 1,
+             "the Rules plus should append and select a new rule");
+
+    [editor removeRule:nil];
+    LRAssert(editor.currentConfiguration.rules.count == originalRuleCount,
+             "an untouched new rule should delete immediately without confirmation");
+
+    [editor addRule:nil];
+    NSSegmentedControl *mode = [NSSegmentedControl
+        segmentedControlWithLabels:@[@"Exact", @"Subdomains"]
+                      trackingMode:NSSegmentSwitchTrackingSelectOne
+                            target:nil
+                            action:nil];
+    mode.tag = 0;
+    mode.selectedSegment = 1;
+    [editor domainModeChanged:mode];
+    [editor removeRule:nil];
+    LRAssert(editor.currentConfiguration.rules.count == originalRuleCount + 1,
+             "editing a new rule should restore the normal removal confirmation");
+}
+
+static void TestCollapsedMinusClicksRemoveRepeatedNewRules(void) {
+    LRRulesEditorViewController *editor = [[LRRulesEditorViewController alloc]
+        initWithConfiguration:LRRouterConfiguration.defaultConfiguration
+         configurationChanged:^{}];
+    editor.view.frame = NSMakeRect(0.0, 0.0, 820.0, 520.0);
+    NSOutlineView *rules = [editor valueForKey:@"sidebarOutlineView"];
+    for (NSUInteger index = 0; index < 10; index += 1) {
+        [editor addRule:nil];
+    }
+
+    for (NSUInteger remaining = 10; remaining > 0; remaining -= 1) {
+        [editor.view layoutSubtreeIfNeeded];
+        NSInteger row = rules.selectedRow;
+        NSTableCellView *ruleCell = [rules viewAtColumn:0 row:row makeIfNecessary:YES];
+        [rules layoutSubtreeIfNeeded];
+        NSButton *deleteButton = FindButtonWithAccessibilityLabel(ruleCell, @"Delete rule");
+        NSButton *collapsedButton = [deleteButton valueForKey:@"collapsedButton"];
+        NSPoint minusCenter = [collapsedButton convertPoint:
+            NSMakePoint(NSMidX(collapsedButton.bounds), NSMidY(collapsedButton.bounds))
+                                                     toView:rules.superview];
+        NSView *hitView = [rules hitTest:minusCenter];
+        LRAssert(hitView == deleteButton,
+                 "the collapsed minus should be clickable before Delete expands");
+        if (hitView == deleteButton) { [deleteButton performClick:nil]; }
+        LRAssert(editor.currentConfiguration.rules.count == remaining - 1,
+                 "every click on the minus should remove exactly one untouched new rule");
+    }
 }
 
 static void TestSubdomainModeDisplaysTheWildcardPrefix(void) {
@@ -449,6 +565,9 @@ int main(void) {
         TestNativeSettingsSaveValidatedConfiguration();
         TestSidebarUsesInlineRuleManagement();
         TestFallbackBrowserControlUsesOneRow();
+        TestDetailTitleStartsLevelWithRulesHeader();
+        TestUntouchedNewRuleDeletesWithoutConfirmation();
+        TestCollapsedMinusClicksRemoveRepeatedNewRules();
         TestSubdomainModeDisplaysTheWildcardPrefix();
         TestStatusMenuActionsHaveExplicitTargets();
         TestStartAtLoginMenuReflectsAndChangesSystemState();

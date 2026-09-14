@@ -12,10 +12,14 @@
 
 - The menu-bar menu now focuses on default-browser setup, login launch, opening the rule editor, and quitting; JSON and reload actions remain available inside the editor.
 - Rule and fallback screens now share consistent alignment, compact browser/profile controls, and appearance-aware system materials.
+- The rule title in the detail pane now starts level with the Rules header in the sidebar.
 
 ### Fixed
 
-- Clean builds now generate the complete multi-resolution app icon without depending on the broken macOS 26 `iconutil` assembly path.
+- App icon generation now writes the multi-resolution ICNS directly, with a high-resolution extraction check during bundle verification.
+- Untouched newly added rules can be removed immediately without an unnecessary confirmation sheet.
+- The inline removal control now has correct hit testing throughout its animation; configured and saved rules retain their confirmation sheet.
+- Detail titles now align at the top with the Rules heading.
 
 ### Removed
 

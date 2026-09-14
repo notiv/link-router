@@ -198,6 +198,7 @@
         NSBeep();
         return;
     }
+    [self.rulesEditor markConfigurationSaved];
     [self showStatus:@"Saved" error:NO];
     if (self.configurationSaved != nil) { self.configurationSaved(configuration); }
 }

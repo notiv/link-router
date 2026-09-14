@@ -12,6 +12,7 @@ typedef void (^LRRulesEditorChangeHandler)(void);
                   configurationChanged:(LRRulesEditorChangeHandler)configurationChanged;
 - (void)setConfiguration:(LRRouterConfiguration *)configuration;
 - (LRRouterConfiguration *)currentConfiguration;
+- (void)markConfigurationSaved;
 
 @end
 

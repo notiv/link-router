@@ -97,7 +97,10 @@ static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
 }
 
 - (NSView *)hitTest:(NSPoint)point {
-    return NSPointInRect(point, self.bounds) ? self : nil;
+    // The whole slot is one click target; the animated visuals beneath never track clicks.
+    // AppKit hands -hitTest: a point in the superview's coordinate space.
+    NSPoint localPoint = [self convertPoint:point fromView:self.superview];
+    return !self.hidden && NSPointInRect(localPoint, self.bounds) ? self : nil;
 }
 
 - (void)layout {
@@ -203,12 +206,6 @@ static NSUserInterfaceItemIdentifier const LRDomainFieldIdentifier = @"Domain";
 @end
 
 @implementation LRRuleSidebarCellView
-- (NSView *)hitTest:(NSPoint)point {
-    if (!self.deleteButton.hidden && NSPointInRect(point, self.deleteButton.frame)) {
-        return self.deleteButton;
-    }
-    return [super hitTest:point];
-}
 @end
 
 static NSTextField *LRLabel(NSString *text, NSFont *font, NSColor *color) {
@@ -265,7 +262,9 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 @property(nonatomic, strong) NSOutlineView *specialRoutesOutlineView;
 @property(nonatomic, strong) NSStackView *detailStack;
 @property(nonatomic, strong) LRRoutingRule *draggedRule;
+@property(nonatomic, strong) NSMutableSet<LRRoutingRule *> *rulesAwaitingInitialConfiguration;
 - (void)renderDetail;
+- (void)markRuleConfigured:(LRRoutingRule *)rule;
 - (void)selectItem:(id)item;
 - (void)updateRuleDeleteVisibility;
 @end
@@ -277,6 +276,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     self = [super init];
     if (self) {
         _configurationChanged = [configurationChanged copy];
+        _rulesAwaitingInitialConfiguration = [NSMutableSet set];
         self.splitView.vertical = YES;
         self.splitView.dividerStyle = NSSplitViewDividerStyleThin;
         [self buildSidebar];
@@ -390,7 +390,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         [scrollView.trailingAnchor constraintEqualToAnchor:detail.trailingAnchor],
         [scrollView.bottomAnchor constraintEqualToAnchor:detail.bottomAnchor],
         [document.widthAnchor constraintEqualToAnchor:scrollView.contentView.widthAnchor],
-        [self.detailStack.topAnchor constraintEqualToAnchor:document.safeAreaLayoutGuide.topAnchor constant:26.0],
+        [self.detailStack.topAnchor constraintEqualToAnchor:document.safeAreaLayoutGuide.topAnchor constant:8.0],
         [self.detailStack.centerXAnchor constraintEqualToAnchor:document.centerXAnchor],
         [self.detailStack.leadingAnchor constraintGreaterThanOrEqualToAnchor:document.leadingAnchor
                                                                     constant:30.0],
@@ -410,6 +410,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 }
 
 - (void)setConfiguration:(LRRouterConfiguration *)configuration {
+    [self.rulesAwaitingInitialConfiguration removeAllObjects];
     self.defaultTarget = LRCopyTarget(configuration.defaultTarget);
     self.rules = [NSMutableArray arrayWithCapacity:configuration.rules.count];
     for (LRRoutingRule *rule in configuration.rules) {
@@ -419,6 +420,10 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     [self.specialRoutesOutlineView reloadData];
     [self.sidebarOutlineView expandItem:LRRulesGroup];
     [self selectItem:self.rules.firstObject ?: LRFallbackItem];
+}
+
+- (void)markConfigurationSaved {
+    [self.rulesAwaitingInitialConfiguration removeAllObjects];
 }
 
 - (LRRouterConfiguration *)currentConfiguration {
@@ -633,6 +638,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
                hosts:@[@"example.com"]
               target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome profile:nil]];
     [self.rules addObject:rule];
+    [self.rulesAwaitingInitialConfiguration addObject:rule];
     [self.sidebarOutlineView reloadItem:LRRulesGroup reloadChildren:YES];
     [self.sidebarOutlineView expandItem:LRRulesGroup];
     [self selectItem:rule];
@@ -644,6 +650,10 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     (void)sender;
     LRRoutingRule *rule = [self selectedRule];
     if (rule == nil) { return; }
+    if ([self.rulesAwaitingInitialConfiguration containsObject:rule]) {
+        [self removeSelectedRule];
+        return;
+    }
     NSAlert *alert = [[NSAlert alloc] init];
     alert.alertStyle = NSAlertStyleWarning;
     alert.messageText = [NSString stringWithFormat:@"Remove “%@”?", rule.name];
@@ -656,17 +666,13 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 }
 
 - (void)removeRuleFromSidebar:(NSButton *)sender {
-    NSInteger row = [self.sidebarOutlineView rowForView:sender];
-    if (row < 0) { return; }
-    id item = [self.sidebarOutlineView itemAtRow:row];
-    if (![item isKindOfClass:LRRoutingRule.class]) { return; }
-    [self selectItem:item];
     [self removeRule:sender];
 }
 
 - (void)removeSelectedRule {
     NSInteger index = [self selectedRuleIndex];
     if (index == NSNotFound) { return; }
+    [self.rulesAwaitingInitialConfiguration removeObject:self.rules[(NSUInteger)index]];
     [self.rules removeObjectAtIndex:(NSUInteger)index];
     [self.sidebarOutlineView reloadItem:LRRulesGroup reloadChildren:YES];
     id nextItem = self.rules.count == 0
@@ -674,6 +680,10 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         : self.rules[MIN((NSUInteger)index, self.rules.count - 1)];
     [self selectItem:nextItem];
     [self markChanged];
+}
+
+- (void)markRuleConfigured:(LRRoutingRule *)rule {
+    [self.rulesAwaitingInitialConfiguration removeObject:rule];
 }
 
 - (void)moveRuleAtIndex:(NSUInteger)sourceIndex toChildIndex:(NSUInteger)childIndex {
@@ -694,6 +704,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     (void)sender;
     LRRoutingRule *rule = [self selectedRule];
     if (rule == nil) { return; }
+    [self markRuleConfigured:rule];
     rule.hosts = [rule.hosts arrayByAddingObject:@"example.com"];
     [self renderDetail];
     [self markChanged];
@@ -706,6 +717,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
         sender.tag >= (NSInteger)rule.hosts.count) {
         return;
     }
+    [self markRuleConfigured:rule];
     NSMutableArray<NSString *> *hosts = [rule.hosts mutableCopy];
     [hosts removeObjectAtIndex:(NSUInteger)sender.tag];
     rule.hosts = hosts;
@@ -716,6 +728,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 - (void)domainModeChanged:(NSSegmentedControl *)sender {
     LRRoutingRule *rule = [self selectedRule];
     if (rule == nil || sender.tag < 0 || sender.tag >= (NSInteger)rule.hosts.count) { return; }
+    [self markRuleConfigured:rule];
     NSMutableArray<NSString *> *hosts = [rule.hosts mutableCopy];
     NSString *host = [hosts[(NSUInteger)sender.tag] stringByReplacingOccurrencesOfString:@"*."
                                                                                withString:@""
@@ -744,6 +757,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     if (rule == nil) {
         self.defaultTarget = replacement;
     } else {
+        [self markRuleConfigured:rule];
         rule.target = replacement;
         [self.sidebarOutlineView reloadItem:rule];
     }
@@ -761,6 +775,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
     if (rule == nil) {
         self.defaultTarget = replacement;
     } else {
+        [self markRuleConfigured:rule];
         rule.target = replacement;
         [self.sidebarOutlineView reloadItem:rule];
     }
@@ -770,6 +785,7 @@ static LRRoutingRule *LRCopyRule(LRRoutingRule *rule) {
 - (void)controlTextDidChange:(NSNotification *)notification {
     NSTextField *field = notification.object;
     LRRoutingRule *rule = [self selectedRule];
+    if (rule != nil) { [self markRuleConfigured:rule]; }
     if ([field.identifier isEqual:LRNameFieldIdentifier] && rule != nil) {
         rule.name = field.stringValue;
         [self.sidebarOutlineView reloadItem:rule];
