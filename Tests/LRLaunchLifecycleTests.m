@@ -40,8 +40,13 @@
     (void)sender;
     self.editorRequested = YES;
 }
+@end
 
-static void TestFileOpenEventIsRejected(void) {
+// LinkRouter inherits the public.html content type when it becomes the default
+// browser, so Finder hands it local .html files. Forward them to the fallback
+// browser rather than dropping them: an LSUIElement agent has no window in which
+// a dropped file could ever become visible.
+static void TestFileOpenEventReachesTheFallbackBrowser(void) {
     LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
     LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
     [delegate setValue:launcher forKey:@"browserLauncher"];
@@ -49,10 +54,11 @@ static void TestFileOpenEventIsRejected(void) {
 
     [delegate application:nil openURLs:@[fileURL]];
 
-    LRAssert(launcher.openedURL == nil,
-             "a macOS file-open event should not reach the browser launcher");
+    LRAssert([launcher.openedURL isEqual:fileURL],
+             "a macOS file-open event should reach the browser launcher");
+    LRAssert(launcher.target.application == LRBrowserApplicationSafari,
+             "a file-open event should use the fallback browser");
 }
-@end
 
 static void TestExplicitApplicationOpenShowsEditor(void) {
     LRRecordingAppDelegate *delegate = [[LRRecordingAppDelegate alloc] init];
@@ -110,7 +116,7 @@ int main(void) {
     @autoreleasepool {
         TestExplicitApplicationOpenShowsEditor();
         TestLoginLaunchDoesNotOpenEditor();
-        TestFileOpenEventIsRejected();
+        TestFileOpenEventReachesTheFallbackBrowser();
         return LRFinishTests();
     }
 }

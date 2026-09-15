@@ -45,10 +45,29 @@ static BOOL LRHostMatchesPattern(NSString *host, NSString *pattern) {
 
 - (LRRouteResult *)routeForURL:(NSURL *)URL error:(NSError **)error {
     NSString *scheme = URL.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"file"]) {
+        // A file URL may carry an authority (file://host/path). Only the local
+        // machine is a file LinkRouter can hand to a browser.
+        NSString *fileHost = URL.host.lowercaseString;
+        if (fileHost.length > 0 && ![fileHost isEqualToString:@"localhost"]) {
+            LRSetRoutingError(error,
+                              LRRoutingErrorRemoteFileHost,
+                              [NSString stringWithFormat:@"LinkRouter opens local files only, not files on '%@'.",
+                                                         URL.host]);
+            return nil;
+        }
+        if (URL.path.length == 0) {
+            LRSetRoutingError(error, LRRoutingErrorMissingPath, @"The file URL has no path.");
+            return nil;
+        }
+        // Host rules match web hosts; a local file is addressed by path, so no
+        // rule can claim one and it always takes the fallback.
+        return [[LRRouteResult alloc] initWithTarget:self.configuration.defaultTarget ruleName:nil];
+    }
     if (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"]) {
         LRSetRoutingError(error,
                           LRRoutingErrorUnsupportedScheme,
-                          [NSString stringWithFormat:@"LinkRouter only opens HTTP and HTTPS URLs, not '%@'.",
+                          [NSString stringWithFormat:@"LinkRouter only opens web links and local files, not '%@' URLs.",
                                                      scheme.length > 0 ? scheme : @"unknown"]);
         return nil;
     }

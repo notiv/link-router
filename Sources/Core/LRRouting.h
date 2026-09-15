@@ -8,6 +8,8 @@ typedef NS_ERROR_ENUM(LRRoutingErrorDomain, LRRoutingErrorCode) {
     LRRoutingErrorInvalidConfiguration = 1,
     LRRoutingErrorUnsupportedScheme = 2,
     LRRoutingErrorMissingHost = 3,
+    LRRoutingErrorMissingPath = 4,
+    LRRoutingErrorRemoteFileHost = 5,
 };
 
 typedef NS_ENUM(NSUInteger, LRBrowserApplication) {
@@ -85,6 +87,7 @@ typedef NS_ENUM(NSUInteger, LRLaunchMode) {
 + (nullable instancetype)planForURL:(NSURL *)URL
                              target:(LRBrowserTarget *)target
                               error:(NSError **)error;
++ (NSString *)bundleIdentifierForTarget:(LRBrowserTarget *)target;
 
 @end
 

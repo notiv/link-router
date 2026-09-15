@@ -8,6 +8,11 @@
 
 @implementation LRLaunchPlan
 
++ (NSString *)bundleIdentifierForTarget:(LRBrowserTarget *)target {
+    return target.application == LRBrowserApplicationSafari ? @"com.apple.Safari"
+                                                            : @"com.google.Chrome";
+}
+
 + (instancetype)planForURL:(NSURL *)URL
                      target:(LRBrowserTarget *)target
                       error:(NSError **)error {
@@ -25,14 +30,13 @@
     }
 
     LRLaunchPlan *plan = [[self alloc] init];
+    plan.bundleIdentifier = [self bundleIdentifierForTarget:target];
     if (target.application == LRBrowserApplicationSafari) {
         plan.mode = LRLaunchModeWorkspace;
-        plan.bundleIdentifier = @"com.apple.Safari";
         plan.arguments = @[];
         return plan;
     }
 
-    plan.bundleIdentifier = @"com.google.Chrome";
     if (target.profile.length == 0 && !target.privateBrowsing) {
         plan.mode = LRLaunchModeWorkspace;
         plan.arguments = @[];

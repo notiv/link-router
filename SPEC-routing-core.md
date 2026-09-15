@@ -2,7 +2,7 @@
 
 ## Objective
 
-Provide a small, dependency-free Objective-C library that turns an HTTP or HTTPS URL and a human-readable JSON config into a browser target. Host rules are evaluated from top to bottom, and the first matching rule wins.
+Provide a small, dependency-free Objective-C library that turns a web link or a local file and a human-readable JSON config into a browser target. Host rules are evaluated from top to bottom, and the first matching rule wins.
 
 The JSON format is:
 
@@ -21,7 +21,11 @@ The JSON format is:
 }
 ```
 
-An exact host matches only itself. A leading `*.` matches both the base domain and its subdomains. Matching is case-insensitive. Only `http` and `https` URLs are routable.
+An exact host matches only itself. A leading `*.` matches both the base domain and its subdomains. Matching is case-insensitive. Only `http`, `https`, and `file` URLs are routable; every other scheme is rejected.
+
+Host rules match web hosts only, so no rule can claim a local file — it always opens in the fallback browser. LinkRouter must route local files because macOS hands the default browser the `public.html` content type, so Finder sends it every double-clicked `.html` file.
+
+A `file` URL can still carry an authority (`file://host/path`). Only an empty authority or `localhost` is local; any other host is rejected, as is a `file` URL with no path.
 
 ## Tech Stack
 
@@ -60,7 +64,7 @@ Types use an `LR` prefix and `UpperCamelCase`; methods and properties use `lower
 
 ## Boundaries
 
-- Always: validate URL schemes, host patterns, app names, Chrome profile directory names, and private-mode compatibility.
+- Always: validate URL schemes, file paths, host patterns, app names, Chrome profile directory names, and private-mode compatibility.
 - Ask first: change the config schema incompatibly or add a dependency.
 - Never: execute config text as code, interpolate config into a shell command, or overwrite an invalid existing config automatically.
 

@@ -1,5 +1,7 @@
 #import <AppKit/AppKit.h>
+#import "LRAlertPresenter.h"
 #import "LRAppDelegate.h"
+#import "LRBrowserLauncher.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
 #import "LRLoginItemController.h"
@@ -8,6 +10,9 @@
 #import "LRTestSupport.h"
 
 @interface LRAppDelegate (Testing)
+- (void)routeURL:(NSURL *)URL;
+// Redeclared so the unaudited signature accepts a nil application in tests.
+- (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)URLs;
 - (NSMenu *)buildMenu;
 - (void)menuNeedsUpdate:(NSMenu *)menu;
 - (void)toggleStartAtLogin:(id)sender;
@@ -28,6 +33,71 @@
 
 @interface NSButton (LRHoverTesting)
 - (void)setExpanded:(BOOL)expanded;
+@end
+
+@interface LRRecordingAlertPresenter : NSObject <LRAlertPresenting>
+@property(nonatomic, copy, nullable) NSString *presentedTitle;
+@property(nonatomic, copy, nullable) NSString *presentedMessage;
+@property(nonatomic) NSUInteger presentCount;
+@end
+
+@implementation LRRecordingAlertPresenter
+
+- (void)presentFailureWithTitle:(NSString *)title message:(NSString *)message {
+    self.presentedTitle = title;
+    self.presentedMessage = message;
+    self.presentCount += 1;
+}
+
+@end
+
+@interface LRRecordingBrowserLauncher : NSObject <LRBrowserLaunching>
+@property(nonatomic, strong, nullable) NSURL *openedURL;
+@property(nonatomic, strong, nullable) LRBrowserTarget *openedTarget;
+@property(nonatomic) NSUInteger openCount;
+// Set to make every launch fail; deferCompletion holds the callbacks so a test
+// can model NSWorkspace answering after application:openURLs: has returned.
+@property(nonatomic, strong, nullable) NSError *launchError;
+@property(nonatomic) BOOL deferCompletion;
+@property(nonatomic, strong) NSMutableArray<LRBrowserLaunchCompletion> *deferredCompletions;
+- (void)flushDeferredCompletions;
+@end
+
+@implementation LRRecordingBrowserLauncher
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _deferredCompletions = [NSMutableArray array];
+    }
+    return self;
+}
+
+- (void)openURL:(NSURL *)URL
+         target:(LRBrowserTarget *)target
+     completion:(LRBrowserLaunchCompletion)completion {
+    self.openedURL = URL;
+    self.openedTarget = target;
+    self.openCount += 1;
+    NSError *result = self.launchError;
+    if (self.deferCompletion) {
+        [self.deferredCompletions addObject:^(NSError *unused) {
+            (void)unused;
+            completion(result);
+        }];
+        return;
+    }
+    completion(result);
+}
+
+- (void)flushDeferredCompletions {
+    NSArray<LRBrowserLaunchCompletion> *pending = [self.deferredCompletions copy];
+    [self.deferredCompletions removeAllObjects];
+    for (LRBrowserLaunchCompletion completion in pending) {
+        completion(nil);
+    }
+}
+
 @end
 
 @interface LRRecordingLoginItemController : NSObject <LRLoginItemControlling>
@@ -559,6 +629,122 @@ static void TestStartAtLoginFailureIsVisible(void) {
              "a login-item registration failure should be visible in the menu status");
 }
 
+static void TestLocalFilesOpenInTheFallbackBrowser(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
+    LRRecordingAlertPresenter *presenter = [[LRRecordingAlertPresenter alloc] init];
+    [delegate setValue:launcher forKey:@"browserLauncher"];
+    [delegate setValue:presenter forKey:@"alertPresenter"];
+
+    NSMenu *menu = [delegate buildMenu];
+    NSURL *fileURL = [NSURL fileURLWithPath:@"/tmp/explainer.html"];
+    [delegate routeURL:fileURL];
+
+    LRAssert([launcher.openedURL isEqual:fileURL],
+             "double-clicking a local file should reach the browser launcher");
+    LRAssert(launcher.openedTarget.application == LRBrowserApplicationSafari,
+             "a local file should open in the fallback browser");
+    LRAssert(presenter.presentCount == 0, "opening a local file should not raise an alert");
+    LRAssert([menu.itemArray.firstObject.title containsString:@"Fallback"],
+             "the status menu should report the fallback route");
+}
+
+static void TestUnroutableURLsRaiseAVisibleAlert(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
+    LRRecordingAlertPresenter *presenter = [[LRRecordingAlertPresenter alloc] init];
+    [delegate setValue:launcher forKey:@"browserLauncher"];
+    [delegate setValue:presenter forKey:@"alertPresenter"];
+
+    NSMenu *menu = [delegate buildMenu];
+    [delegate routeURL:[NSURL URLWithString:@"ftp://example.com/file"]];
+
+    LRAssert(launcher.openedURL == nil, "an unroutable URL should never reach the launcher");
+    LRAssert(presenter.presentCount == 1,
+             "an agent app must surface a rejection instead of dying silently");
+    LRAssert([presenter.presentedMessage containsString:@"ftp"],
+             "the alert should name the scheme that was rejected");
+    LRAssert([menu.itemArray.firstObject.title containsString:@"Rejected URL"],
+             "the status menu should still record the rejection");
+}
+
+static void TestLaunchFailureRaisesAVisibleAlert(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
+    LRRecordingAlertPresenter *presenter = [[LRRecordingAlertPresenter alloc] init];
+    launcher.launchError = [NSError errorWithDomain:@"LRLaunchTests"
+                                               code:1
+                                           userInfo:@{NSLocalizedDescriptionKey: @"Safari is not installed."}];
+    [delegate setValue:launcher forKey:@"browserLauncher"];
+    [delegate setValue:presenter forKey:@"alertPresenter"];
+
+    NSMenu *menu = [delegate buildMenu];
+    [delegate routeURL:[NSURL fileURLWithPath:@"/tmp/explainer.html"]];
+
+    LRAssert(presenter.presentCount == 1, "a failed launch should raise exactly one alert");
+    LRAssert([presenter.presentedMessage containsString:@"Safari is not installed."],
+             "the alert should carry the launch error");
+    LRAssert([menu.itemArray.firstObject.title containsString:@"Open failed"],
+             "the status menu should record the launch failure");
+}
+
+static void TestDeferredLaunchFailureRaisesAVisibleAlert(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
+    LRRecordingAlertPresenter *presenter = [[LRRecordingAlertPresenter alloc] init];
+    launcher.deferCompletion = YES;
+    launcher.launchError = [NSError errorWithDomain:@"LRLaunchTests"
+                                               code:1
+                                           userInfo:@{NSLocalizedDescriptionKey: @"Chrome is not installed."}];
+    [delegate setValue:launcher forKey:@"browserLauncher"];
+    [delegate setValue:presenter forKey:@"alertPresenter"];
+
+    [delegate application:nil openURLs:@[[NSURL URLWithString:@"https://example.com"]]];
+    LRAssert(presenter.presentCount == 0, "an outstanding launch should not alert yet");
+
+    [launcher flushDeferredCompletions];
+    LRAssert(presenter.presentCount == 1,
+             "a launch failing after the batch returns should still alert");
+    LRAssert([presenter.presentedMessage containsString:@"Chrome is not installed."],
+             "the deferred alert should carry the launch error");
+}
+
+static void TestABadURLDoesNotBlockTheRestOfTheBatch(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
+    LRRecordingAlertPresenter *presenter = [[LRRecordingAlertPresenter alloc] init];
+    [delegate setValue:launcher forKey:@"browserLauncher"];
+    [delegate setValue:presenter forKey:@"alertPresenter"];
+
+    NSURL *good = [NSURL URLWithString:@"https://example.com"];
+    [delegate application:nil
+                 openURLs:@[[NSURL URLWithString:@"ftp://example.com/file"], good]];
+
+    LRAssert([launcher.openedURL isEqual:good],
+             "a rejected URL must not stop the next URL in the batch from opening");
+    LRAssert(presenter.presentCount == 1,
+             "a batch should raise its alert once, after every URL is dispatched");
+}
+
+static void TestBatchFailuresCoalesceIntoOneAlert(void) {
+    LRAppDelegate *delegate = [[LRAppDelegate alloc] init];
+    LRRecordingBrowserLauncher *launcher = [[LRRecordingBrowserLauncher alloc] init];
+    LRRecordingAlertPresenter *presenter = [[LRRecordingAlertPresenter alloc] init];
+    [delegate setValue:launcher forKey:@"browserLauncher"];
+    [delegate setValue:presenter forKey:@"alertPresenter"];
+
+    [delegate application:nil
+                 openURLs:@[[NSURL URLWithString:@"ftp://example.com/one"],
+                            [NSURL URLWithString:@"mailto:someone@example.com"]]];
+
+    LRAssert(presenter.presentCount == 1, "two failures in one batch should raise one alert");
+    LRAssert([presenter.presentedMessage containsString:@"ftp"] &&
+                 [presenter.presentedMessage containsString:@"mailto"],
+             "the coalesced alert should name every failure in the batch");
+    LRAssert([presenter.presentedTitle containsString:@"2 links"],
+             "the coalesced alert should count the failures");
+}
+
 int main(void) {
     @autoreleasepool {
         TestEditorUsesNativeLiquidGlassControls();
@@ -573,6 +759,12 @@ int main(void) {
         TestStartAtLoginMenuReflectsAndChangesSystemState();
         TestStartAtLoginApprovalOpensSystemSettings();
         TestStartAtLoginFailureIsVisible();
+        TestLocalFilesOpenInTheFallbackBrowser();
+        TestUnroutableURLsRaiseAVisibleAlert();
+        TestLaunchFailureRaisesAVisibleAlert();
+        TestDeferredLaunchFailureRaisesAVisibleAlert();
+        TestABadURLDoesNotBlockTheRestOfTheBatch();
+        TestBatchFailuresCoalesceIntoOneAlert();
         return LRFinishTests();
     }
 }

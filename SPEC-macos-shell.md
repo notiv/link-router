@@ -2,7 +2,7 @@
 
 ## Objective
 
-Deliver a native, menu-bar-only macOS app named LinkRouter. macOS sends it HTTP and HTTPS URLs; it evaluates the config and immediately opens the chosen target in Safari or Google Chrome. Chrome targets may include a profile directory such as `Default` or `Profile 1` and may request an Incognito window.
+Deliver a native, menu-bar-only macOS app named LinkRouter. macOS sends it HTTP and HTTPS URLs, and — because the default browser also receives the `public.html` content type — double-clicked local files; it evaluates the config and immediately opens the chosen target in Safari or Google Chrome. Setting LinkRouter as the default browser hands `public.html` and `public.xhtml` back to the fallback browser, and the bundle never declares document types of its own. Chrome targets may include a profile directory such as `Default` or `Profile 1` and may request an Incognito window.
 
 ## Tech Stack
 

@@ -12,7 +12,7 @@ COMMON_FLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(BUILD_DIR)/ModuleCac
 CORE_SOURCES := $(wildcard Sources/Core/*.m)
 APP_SOURCES := $(wildcard Sources/App/*.m)
 APP_LIBRARY_SOURCES := $(filter-out Sources/App/main.m,$(APP_SOURCES))
-APP_FRAMEWORKS := -framework Cocoa -framework ServiceManagement
+APP_FRAMEWORKS := -framework Cocoa -framework ServiceManagement -framework UniformTypeIdentifiers
 TEST_BINARIES := $(BUILD_DIR)/LRConfigurationTests $(BUILD_DIR)/LRRouterTests $(BUILD_DIR)/LRLaunchPlanTests $(BUILD_DIR)/LRConfigStoreTests $(BUILD_DIR)/LRIntegrationTests $(BUILD_DIR)/LRLaunchLifecycleTests $(BUILD_DIR)/LRAppDelegateTests $(BUILD_DIR)/LRIconFactoryTests
 
 .PHONY: all build test test-config test-router test-launch-plan test-store test-integration test-launch-lifecycle test-app-delegate test-icon icon app installer verify verify-bundle verify-installer run clean

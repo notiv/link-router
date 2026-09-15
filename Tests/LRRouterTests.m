@@ -47,13 +47,74 @@ static void TestExactWildcardPrecedenceAndFallback(void) {
              "unmatched URL should use fallback");
 }
 
-static void TestRejectsFileURLs(void) {
+static void TestRoutesFileURLsToTheFallback(void) {
     NSError *error = nil;
     LRRouteResult *result = [TestRouter() routeForURL:[NSURL fileURLWithPath:@"/tmp/page.html"]
                                                 error:&error];
-    LRAssert(result == nil, "a local file URL should be rejected");
-    LRAssert(error.code == LRRoutingErrorUnsupportedScheme,
-             "a local file URL should report an unsupported scheme");
+    LRAssert(result != nil && error == nil, "a local file URL should route");
+    LRAssert(result.ruleName == nil, "a local file URL has no host, so no rule can claim it");
+    LRAssert(result.target.application == LRBrowserApplicationSafari,
+             "a local file URL should open in the fallback browser");
+}
+
+static void TestHostRulesNeverClaimFileURLs(void) {
+    // A file URL whose path spells out a rule's host must still take the fallback.
+    // Assert non-nil first: Safari is enum 0 and messaging nil returns 0, so the
+    // checks below would otherwise pass for a rejected route.
+    NSError *error = nil;
+    LRRouteResult *result = [TestRouter()
+        routeForURL:[NSURL fileURLWithPath:@"/tmp/docs.example.com/page.html"]
+              error:&error];
+    LRAssert(result != nil && error == nil, "a host-like file path should still route");
+    LRAssert(result.ruleName == nil, "a path that looks like a host should not match a host rule");
+    LRAssert(result.target.application == LRBrowserApplicationSafari,
+             "a path that looks like a host should still use the fallback");
+}
+
+static void TestRejectsRemoteFileAuthorities(void) {
+    // file://host/path really does parse a host, so a rule's domain can appear
+    // in the authority of a file URL. Those are not local files.
+    NSError *error = nil;
+    LRRouteResult *result = [TestRouter()
+        routeForURL:[NSURL URLWithString:@"file://docs.example.com/tmp/page.html"]
+              error:&error];
+    LRAssert(result == nil, "a file URL on a remote authority should be rejected");
+    LRAssert(error.code == LRRoutingErrorRemoteFileHost,
+             "a remote file authority should report a remote host");
+}
+
+static void TestAcceptsLocalhostFileAuthority(void) {
+    NSError *error = nil;
+    LRRouteResult *result = [TestRouter()
+        routeForURL:[NSURL URLWithString:@"file://localhost/tmp/page.html"] error:&error];
+    LRAssert(result != nil && error == nil, "file://localhost names the local machine");
+    LRAssert(result.target.application == LRBrowserApplicationSafari,
+             "a localhost file URL should use the fallback");
+}
+
+static void TestFileURLsFollowTheConfiguredFallback(void) {
+    // Guards against a hardcoded Safari: the fallback must come from the config.
+    LRRouterConfiguration *configuration = [[LRRouterConfiguration alloc]
+        initWithDefaultTarget:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome
+                                                             profile:@"Profile 1"]
+                        rules:@[]];
+    LRRouter *router = [[LRRouter alloc] initWithConfiguration:configuration error:nil];
+    NSError *error = nil;
+    LRRouteResult *result = [router routeForURL:[NSURL fileURLWithPath:@"/tmp/page.html"]
+                                          error:&error];
+    LRAssert(result != nil && error == nil, "a local file should route under a Chrome fallback");
+    LRAssert(result.target.application == LRBrowserApplicationChrome,
+             "a local file should follow the configured fallback, not a hardcoded Safari");
+    LRAssert([result.target.profile isEqualToString:@"Profile 1"],
+             "a local file should keep the fallback's Chrome profile");
+}
+
+static void TestRejectsPathlessFileURLs(void) {
+    NSError *error = nil;
+    LRRouteResult *result = [TestRouter() routeForURL:[NSURL URLWithString:@"file://"] error:&error];
+    LRAssert(result == nil, "a file URL without a path should be rejected");
+    LRAssert(error.code == LRRoutingErrorMissingPath,
+             "a file URL without a path should report a missing path");
 }
 
 static void TestRejectsUnsupportedSchemes(void) {
@@ -68,7 +129,12 @@ static void TestRejectsUnsupportedSchemes(void) {
 int main(void) {
     @autoreleasepool {
         TestExactWildcardPrecedenceAndFallback();
-        TestRejectsFileURLs();
+        TestRoutesFileURLsToTheFallback();
+        TestHostRulesNeverClaimFileURLs();
+        TestRejectsRemoteFileAuthorities();
+        TestAcceptsLocalhostFileAuthority();
+        TestFileURLsFollowTheConfiguredFallback();
+        TestRejectsPathlessFileURLs();
         TestRejectsUnsupportedSchemes();
         return LRFinishTests();
     }

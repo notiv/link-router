@@ -50,16 +50,65 @@ static void TestPrivateChromePlanSupportsProfiles(void) {
              "Chrome should receive profile and incognito switches before the URL");
 }
 
-static void TestLaunchPlanRejectsLocalFiles(void) {
+static void TestLaunchPlanOpensLocalFiles(void) {
     NSError *error = nil;
-    LRLaunchPlan *plan = [LRLaunchPlan
-        planForURL:[NSURL fileURLWithPath:@"/tmp/Local Page.html"]
+    NSURL *fileURL = [NSURL fileURLWithPath:@"/tmp/Local Page.html"];
+    LRLaunchPlan *safari = [LRLaunchPlan
+        planForURL:fileURL
             target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]
              error:&error];
 
-    LRAssert(plan == nil, "a launch plan should reject local file URLs");
+    LRAssert(safari != nil && error == nil, "a launch plan should accept local file URLs");
+    LRAssert(safari.mode == LRLaunchModeWorkspace, "a local file should open through NSWorkspace");
+
+    LRLaunchPlan *chrome = [LRLaunchPlan
+        planForURL:fileURL
+            target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome
+                                                  profile:@"Profile 1"]
+             error:&error];
+    NSArray<NSString *> *expectedArguments =
+        @[@"--profile-directory=Profile 1", fileURL.absoluteString];
+    LRAssert([chrome.arguments isEqualToArray:expectedArguments],
+             "a local file should reach Chrome as a single percent-encoded argument");
+}
+
+static void TestBundleIdentifiersAreExplicit(void) {
+    // Reused when handing the public.html content type back to a real browser.
+    LRAssert([[LRLaunchPlan bundleIdentifierForTarget:
+                   [LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]]
+                 isEqualToString:@"com.apple.Safari"],
+             "Safari should resolve to its explicit bundle identifier");
+    LRAssert([[LRLaunchPlan bundleIdentifierForTarget:
+                   [LRBrowserTarget targetWithApplication:LRBrowserApplicationChrome
+                                                  profile:@"Profile 1"]]
+                 isEqualToString:@"com.google.Chrome"],
+             "Chrome should resolve to its explicit bundle identifier regardless of profile");
+}
+
+static void TestLaunchPlanRejectsPathlessFileURLs(void) {
+    NSError *error = nil;
+    LRLaunchPlan *plan = [LRLaunchPlan
+        planForURL:[NSURL URLWithString:@"file://"]
+            target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]
+             error:&error];
+
+    LRAssert(plan == nil, "a launch plan should reject a file URL with no path");
+    LRAssert([error.domain isEqualToString:LRRoutingErrorDomain],
+             "a rejected launch should report the routing error domain");
+    LRAssert(error.code == LRRoutingErrorMissingPath,
+             "a pathless file launch should report a missing path");
+}
+
+static void TestLaunchPlanRejectsUnsupportedSchemes(void) {
+    NSError *error = nil;
+    LRLaunchPlan *plan = [LRLaunchPlan
+        planForURL:[NSURL URLWithString:@"ftp://example.com/file"]
+            target:[LRBrowserTarget targetWithApplication:LRBrowserApplicationSafari profile:nil]
+             error:&error];
+
+    LRAssert(plan == nil, "a launch plan should reject unsupported schemes");
     LRAssert(error.code == LRRoutingErrorUnsupportedScheme,
-             "a local file launch should report an unsupported scheme");
+             "an unsupported launch should report an unsupported scheme");
 }
 
 static void TestPrivateChromePlanDoesNotRequireAProfile(void) {
@@ -81,7 +130,10 @@ int main(void) {
     @autoreleasepool {
         TestSafariAndChromePlans();
         TestPrivateChromePlanSupportsProfiles();
-        TestLaunchPlanRejectsLocalFiles();
+        TestLaunchPlanOpensLocalFiles();
+        TestBundleIdentifiersAreExplicit();
+        TestLaunchPlanRejectsPathlessFileURLs();
+        TestLaunchPlanRejectsUnsupportedSchemes();
         TestPrivateChromePlanDoesNotRequireAProfile();
         return LRFinishTests();
     }

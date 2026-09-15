@@ -1,5 +1,6 @@
 #import "LRAppDelegate.h"
 
+#import "LRAlertPresenter.h"
 #import "LRBrowserLauncher.h"
 #import "LRConfigStore.h"
 #import "LRConfigWindowController.h"
@@ -8,12 +9,17 @@
 #import "LRRouting.h"
 
 #import <CoreServices/CoreServices.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 @interface LRAppDelegate () <NSMenuDelegate>
 @property(nonatomic, strong) LRConfigStore *configStore;
 @property(nonatomic, strong) LRRouterConfiguration *configuration;
 @property(nonatomic, strong) LRRouter *router;
 @property(nonatomic, strong) id<LRBrowserLaunching> browserLauncher;
+@property(nonatomic, strong) id<LRAlertPresenting> alertPresenter;
+@property(nonatomic, strong) NSMutableArray<NSString *> *pendingFailures;
+@property(nonatomic) NSUInteger outstandingRoutes;
+@property(nonatomic) BOOL deliveringBatch;
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *startAtLoginMenuItem;
@@ -33,6 +39,8 @@
     if (self) {
         _configStore = [[LRConfigStore alloc] initWithConfigURL:LRConfigStore.defaultConfigURL];
         _browserLauncher = [[LRBrowserLauncher alloc] init];
+        _alertPresenter = [[LRAlertPresenter alloc] init];
+        _pendingFailures = [NSMutableArray array];
         _loginItemController = [[LRLoginItemController alloc] init];
         _configuration = LRRouterConfiguration.defaultConfiguration;
         _router = [[LRRouter alloc] initWithConfiguration:_configuration error:nil];
@@ -79,9 +87,14 @@
 
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)URLs {
     (void)application;
+    // Hold failures until every URL in the batch has been dispatched, so one bad
+    // link never blocks the rest behind a modal alert.
+    self.deliveringBatch = YES;
     for (NSURL *URL in URLs) {
         [self routeURL:URL];
     }
+    self.deliveringBatch = NO;
+    [self presentPendingFailuresIfIdle];
 }
 
 - (void)buildStatusMenu {
@@ -192,24 +205,47 @@
     [self setStatus:summary];
 }
 
+- (void)recordFailure:(NSString *)summary message:(NSString *)message {
+    [self setStatus:[summary stringByAppendingString:message]];
+    [self.pendingFailures addObject:message];
+}
+
+- (void)presentPendingFailuresIfIdle {
+    if (self.deliveringBatch || self.outstandingRoutes > 0 || self.pendingFailures.count == 0) {
+        return;
+    }
+    NSArray<NSString *> *failures = [self.pendingFailures copy];
+    [self.pendingFailures removeAllObjects];
+    NSString *title = failures.count == 1
+        ? @"LinkRouter could not open this link"
+        : [NSString stringWithFormat:@"LinkRouter could not open %lu links",
+                                     (unsigned long)failures.count];
+    [self.alertPresenter presentFailureWithTitle:title
+                                         message:[failures componentsJoinedByString:@"\n"]];
+}
+
 - (void)routeURL:(NSURL *)URL {
     NSError *error = nil;
     LRRouteResult *route = [self.router routeForURL:URL error:&error];
     if (route == nil) {
-        [self setStatus:[@"Rejected URL: " stringByAppendingString:error.localizedDescription]];
+        [self recordFailure:@"Rejected URL: " message:error.localizedDescription];
+        [self presentPendingFailuresIfIdle];
         return;
     }
     NSString *source = route.ruleName ?: @"Fallback";
+    self.outstandingRoutes += 1;
     [self.browserLauncher openURL:URL
                            target:route.target
                        completion:^(NSError *launchError) {
+                           self.outstandingRoutes -= 1;
                            if (launchError != nil) {
-                               [self setStatus:[@"Open failed: "
-                                                   stringByAppendingString:launchError.localizedDescription]];
-                               return;
+                               [self recordFailure:@"Open failed: "
+                                           message:launchError.localizedDescription];
+                           } else {
+                               [self setStatus:[NSString stringWithFormat:@"%@ → %@", source,
+                                                                           route.target.displayName]];
                            }
-                           [self setStatus:[NSString stringWithFormat:@"%@ → %@", source,
-                                                                       route.target.displayName]];
+                           [self presentPendingFailuresIfIdle];
                        }];
 }
 
@@ -237,6 +273,42 @@
     }];
 }
 
+// Becoming the default browser makes macOS hand LinkRouter the public.html
+// content type as well, so Finder would send it every double-clicked .html file.
+// LinkRouter routes links, not documents: give HTML straight back to the browser
+// unmatched links go to, so the OS stops routing documents through an agent app.
+- (void)handHTMLDocumentsToTarget:(LRBrowserTarget *)target
+                  contentTypeIndex:(NSUInteger)index
+                        completion:(void (^)(NSError *error))completion {
+    NSArray<NSString *> *identifiers = @[@"public.html", @"public.xhtml"];
+    if (index >= identifiers.count) {
+        completion(nil);
+        return;
+    }
+    UTType *contentType = [UTType typeWithIdentifier:identifiers[index]];
+    NSURL *browserURL = [NSWorkspace.sharedWorkspace
+        URLForApplicationWithBundleIdentifier:[LRLaunchPlan bundleIdentifierForTarget:target]];
+    if (contentType == nil || browserURL == nil) {
+        [self handHTMLDocumentsToTarget:target
+                       contentTypeIndex:index + 1
+                             completion:completion];
+        return;
+    }
+    [NSWorkspace.sharedWorkspace setDefaultApplicationAtURL:browserURL
+                                          toOpenContentType:contentType
+                                          completionHandler:^(NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error != nil) {
+                completion(error);
+                return;
+            }
+            [self handHTMLDocumentsToTarget:target
+                           contentTypeIndex:index + 1
+                                 completion:completion];
+        });
+    }];
+}
+
 - (void)setAsDefaultBrowser:(id)sender {
     (void)sender;
     NSURL *applicationURL = NSBundle.mainBundle.bundleURL;
@@ -245,6 +317,7 @@
         return;
     }
     [self setStatus:@"Requesting default-browser access…"];
+    LRBrowserTarget *fallback = self.configuration.defaultTarget;
     [self requestDefaultApplicationAtURL:applicationURL
                            forURLSchemes:@[@"http", @"https"]
                                    index:0
@@ -254,7 +327,17 @@
                                 stringByAppendingString:schemeError.localizedDescription]];
             return;
         }
-        [self setStatus:@"LinkRouter handles web links."];
+        [self handHTMLDocumentsToTarget:fallback
+                       contentTypeIndex:0
+                             completion:^(NSError *documentError) {
+            if (documentError != nil) {
+                [self setStatus:[@"HTML files still open in LinkRouter: "
+                                    stringByAppendingString:documentError.localizedDescription]];
+                return;
+            }
+            [self setStatus:[NSString stringWithFormat:@"LinkRouter handles web links; HTML files open in %@.",
+                                                       fallback.displayName]];
+        }];
     }];
 }
 
