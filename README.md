@@ -62,7 +62,9 @@ Private windows are supported for Google Chrome through its Incognito launch mod
 
 Launch the packaged app, open its menu, and choose **Set as Default Browser…**. LinkRouter asks macOS to associate `http` and `https`; macOS may show consent prompts. The app never changes defaults automatically.
 
-Version 0.2.0 no longer registers for `file://` URLs or HTML documents. When upgrading from 0.1.x, replace the older copy in `/Applications` before testing local HTML workflows. If macOS still opens HTML files with LinkRouter afterward, select an HTML file in Finder, choose **Get Info**, select the intended browser under **Open with**, and choose **Change All**.
+Becoming the default browser also makes macOS hand LinkRouter the `public.html` content type, whatever the app bundle declares — so Finder starts sending it every double-clicked `.html` file. Since 0.2.1, **Set as Default Browser…** immediately hands `public.html` and `public.xhtml` back to the browser unmatched links go to, so documents keep opening in a real browser. Any local file that still reaches LinkRouter is forwarded to that same browser rather than dropped.
+
+The app bundle itself never claims HTML: it declares no document types, which bundle verification enforces. If HTML files still open in LinkRouter after upgrading, run **Set as Default Browser…** once, or select an HTML file in Finder, choose **Get Info**, pick the intended browser under **Open with**, and choose **Change All**.
 
 The app must stay running to route links. It has no Dock icon; quit it from **Quit LinkRouter** in the menu.
 

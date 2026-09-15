@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.1] - 2026-09-15
+
+### Fixed
+
+- Double-clicking a local HTML file no longer does nothing. Becoming the default browser makes macOS hand LinkRouter the `public.html` content type regardless of what the bundle declares, so 0.2.0 stopped handling those files while the system kept sending them. Local files are now forwarded to the browser unmatched links go to.
+- **Set as Default Browser** now hands the `public.html` and `public.xhtml` content types back to that same browser, so macOS stops routing documents through LinkRouter in the first place.
+- Routing and launch failures now raise an alert instead of only writing to the menu-bar status, which is invisible in an agent app with no windows.
+- Failures across a batch of URLs are collected and reported once, so one bad link no longer blocks the rest behind a modal.
+
+### Changed
+
+- `file://` URLs on a remote authority are rejected; only an empty authority or `localhost` counts as a local file.
+
 ## [0.2.0] - 2026-09-14
 
 ### Added
@@ -43,6 +56,7 @@
 
 - Initial preview release with ordered hostname routing, Safari and Chrome targets, Chrome profiles and private windows, local-file handling, and the graphical rule editor.
 
+[0.2.1]: https://github.com/notiv/link-router/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/notiv/link-router/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/notiv/link-router/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/notiv/link-router/releases/tag/v0.1.0
